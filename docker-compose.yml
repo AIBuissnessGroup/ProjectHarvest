@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  harvest-ui:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: pnpm dev
+  # Future FastAPI backend service
+  # harvest-api:
+  #   build: ./api
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     - PYTHONPATH=/app
+  #   volumes:
+  #     - ./api:/app
+  #   command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload

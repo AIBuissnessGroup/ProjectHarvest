@@ -1,36 +1,138 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Project Harvest - Fortnite Activation Analytics Platform
 
-## Getting Started
+A comprehensive analytics dashboard for tracking Fortnite map activations, combining in-game performance metrics with external social media engagement data.
 
-First, run the development server:
+## 🎯 Project Overview
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+**Project Harvest** is a collaborative research initiative between:
+- **Cherry Pick Talent** (Epic Games Fortnite Map Activations)
+- **University of Michigan - AI Business Group**
+
+The platform provides real-time tracking and analysis of Fortnite map activations, correlating internal metrics (CCU, discovery panels, retention) with external social media signals (Twitter, TikTok, YouTube, Instagram).
+
+## ✨ Features
+
+### 🤖 AI-Powered Chatbot Interface
+- Cursor-like sidebar interface for natural language queries
+- Real-time analysis of map performance and social trends
+- Interactive data exploration through conversational AI
+
+### 📊 Comprehensive Dashboard
+- **Real-time Metrics**: Live CCU, retention rates, and engagement data
+- **Social Media Analytics**: Cross-platform mention tracking and sentiment analysis
+- **Performance Trends**: Historical data visualization and trend analysis
+- **Top Performing Maps**: Leaderboard of successful activations
+
+### 🎨 Modern UI/UX
+- Dark theme optimized for data visualization
+- Responsive design for all screen sizes
+- Smooth animations and transitions
+- Professional Fortnite-themed branding
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js 18+ 
+- pnpm (recommended) or npm
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd harvest-ui
+   ```
+
+2. **Install dependencies**
+   ```bash
+   pnpm install
+   ```
+
+3. **Start the development server**
+   ```bash
+   pnpm dev
+   ```
+
+4. **Open your browser**
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
+### Docker Setup
+
+1. **Build and run with Docker Compose**
+   ```bash
+   docker-compose up --build
+   ```
+
+2. **Or build the Docker image manually**
+   ```bash
+   docker build -t harvest-ui .
+   docker run -p 3000:3000 harvest-ui
+   ```
+
+## 🛠️ Tech Stack
+
+- **Frontend**: Next.js 16, React 19, TypeScript
+- **Styling**: Tailwind CSS v3, Radix UI components
+- **Icons**: Lucide React
+- **Charts**: Recharts
+- **State Management**: Zustand
+- **Containerization**: Docker, Docker Compose
+
+## 📁 Project Structure
+
+```
+src/
+├── app/                 # Next.js app router
+│   ├── globals.css     # Global styles
+│   ├── layout.tsx      # Root layout
+│   └── page.tsx        # Main dashboard page
+├── components/
+│   └── ui/             # Reusable UI components
+└── lib/
+    └── utils.ts        # Utility functions
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🎮 Key Features Explained
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Dashboard Overview
+- **Active Maps**: Current number of live Fortnite maps
+- **Total CCU**: Concurrent users across all tracked maps
+- **Social Mentions**: Cross-platform social media activity
+- **Engagement Rate**: Overall user engagement metrics
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### AI Assistant
+The chatbot interface allows users to:
+- Query specific map performance data
+- Analyze social media trends
+- Generate insights and reports
+- Explore correlations between in-game and social metrics
 
-## Learn More
+### Data Visualization
+- Interactive charts for map performance trends
+- Social media activity progress bars
+- Top performing maps leaderboard
+- Real-time data updates
 
-To learn more about Next.js, take a look at the following resources:
+## 🔮 Future Enhancements
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **FastAPI Backend**: Python-based API for data processing
+- **Real-time Data**: WebSocket connections for live updates
+- **Advanced Analytics**: Machine learning insights and predictions
+- **Report Generation**: Automated PDF and CSV report exports
+- **Multi-language Support**: Internationalization for global teams
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 🤝 Contributing
 
-## Deploy on Vercel
+This is a research project in collaboration with University of Michigan's AI Business Group. For contribution guidelines, please contact the project maintainers.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📄 License
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project is part of a collaborative research initiative. Please refer to the project documentation for licensing details.
+
+## 🏫 University of Michigan AI Business Group
+
+Powered by the University of Michigan's AI Business Group, bringing cutting-edge AI research to the gaming industry.
+
+---
+
+**Project Harvest** - Transforming Fortnite activation analytics through AI-powered insights.

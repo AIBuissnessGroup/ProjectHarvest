@@ -1,26 +1,36 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
+/* ===== Custom global styles ===== */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --radius: 1rem;
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: system-ui, sans-serif;
+  min-height: 100vh;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* Hide Next.js dev indicator */
+#__next-build-watcher {
+  display: none !important;
+}
+
+/* Hide Vercel toolbar */
+iframe[src*="vercel"] {
+  display: none !important;
 }
