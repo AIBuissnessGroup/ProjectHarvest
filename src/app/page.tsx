@@ -25,10 +25,7 @@ export default function Home() {
             <div
                 className="absolute inset-0 opacity-5"
                 style={{
-                    backgroundImage: `
-            linear-gradient(to right, #14b1e5 1px, transparent 1px),
-            linear-gradient(to bottom, #14b1e5 1px, transparent 1px)
-          `,
+                    backgroundImage: 'linear-gradient(to right, #14b1e5 1px, transparent 1px), linear-gradient(to bottom, #14b1e5 1px, transparent 1px)',
                     backgroundSize: '60px 60px'
                 }}
             />
