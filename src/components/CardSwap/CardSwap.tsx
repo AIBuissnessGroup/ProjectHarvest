@@ -83,7 +83,7 @@ const CardSwap = ({
 
     const order = useRef(Array.from({ length: childArr.length }, (_, i) => i));
     const tlRef = useRef<gsap.core.Timeline | null>(null);
-    const intervalRef = useRef<number>();
+    const intervalRef = useRef<number | undefined>(undefined);
     const container = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -180,7 +180,7 @@ const CardSwap = ({
 
     const rendered = childArr.map((child, i) =>
         isValidElement(child)
-            ? cloneElement(child as React.ReactElement, {
+            ? cloneElement(child as React.ReactElement<any>, {
                 key: i,
                 ref: refs[i],
                 style: { width, height, ...((child.props as any).style ?? {}) },
@@ -188,7 +188,7 @@ const CardSwap = ({
                     (child.props as any).onClick?.(e);
                     onCardClick?.(i);
                 }
-            })
+            } as any)
             : child
     );
 
