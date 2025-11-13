@@ -1,0 +1,286 @@
+{
+  "island": {
+    "code": "3466-8648-9706",
+    "creatorCode": "rich3k",
+    "title": "SUP3R CRAZY RED VS BLUE \ud83d\udd34\ud83d\udd35",
+    "category": "KPop Demon Hunters",
+    "createdIn": "UEFN",
+    "tags": [
+      "team deathmatch",
+      "free for all",
+      "just for fun",
+      "action"
+    ],
+    "meta": {
+      "page": {
+        "cursor": "MzQ2Ni04NjQ4LTk3MDY="
+      }
+    }
+  },
+  "metrics": {
+    "peak-ccu": {
+      "intervals": [
+        {
+          "value": null,
+          "timestamp": "2025-11-07T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-08T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-09T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-10T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-11T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-12T00:00:00.000Z"
+        },
+        {
+          "value": 70,
+          "timestamp": "2025-11-13T00:00:00.000Z"
+        }
+      ]
+    },
+    "favorites": {
+      "intervals": [
+        {
+          "value": null,
+          "timestamp": "2025-11-07T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-08T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-09T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-10T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-11T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-12T00:00:00.000Z"
+        },
+        {
+          "value": 17,
+          "timestamp": "2025-11-13T00:00:00.000Z"
+        }
+      ]
+    },
+    "minutes-played": {
+      "intervals": [
+        {
+          "value": null,
+          "timestamp": "2025-11-07T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-08T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-09T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-10T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-11T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-12T00:00:00.000Z"
+        },
+        {
+          "value": 2420,
+          "timestamp": "2025-11-13T00:00:00.000Z"
+        }
+      ]
+    },
+    "average-minutes-per-player": {
+      "intervals": [
+        {
+          "value": null,
+          "timestamp": "2025-11-07T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-08T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-09T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-10T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-11T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-12T00:00:00.000Z"
+        },
+        {
+          "value": 14.85,
+          "timestamp": "2025-11-13T00:00:00.000Z"
+        }
+      ]
+    },
+    "recommendations": {
+      "intervals": [
+        {
+          "value": null,
+          "timestamp": "2025-11-07T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-08T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-09T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-10T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-11T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-12T00:00:00.000Z"
+        },
+        {
+          "value": 1,
+          "timestamp": "2025-11-13T00:00:00.000Z"
+        }
+      ]
+    },
+    "unique-players": {
+      "intervals": [
+        {
+          "value": null,
+          "timestamp": "2025-11-07T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-08T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-09T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-10T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-11T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-12T00:00:00.000Z"
+        },
+        {
+          "value": 163,
+          "timestamp": "2025-11-13T00:00:00.000Z"
+        }
+      ]
+    },
+    "plays": {
+      "intervals": [
+        {
+          "value": null,
+          "timestamp": "2025-11-07T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-08T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-09T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-10T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-11T00:00:00.000Z"
+        },
+        {
+          "value": null,
+          "timestamp": "2025-11-12T00:00:00.000Z"
+        },
+        {
+          "value": 175,
+          "timestamp": "2025-11-13T00:00:00.000Z"
+        }
+      ]
+    },
+    "retention": {
+      "intervals": [
+        {
+          "d1": null,
+          "d7": null,
+          "timestamp": "2025-11-07T00:00:00.000Z"
+        },
+        {
+          "d1": null,
+          "d7": null,
+          "timestamp": "2025-11-08T00:00:00.000Z"
+        },
+        {
+          "d1": null,
+          "d7": null,
+          "timestamp": "2025-11-09T00:00:00.000Z"
+        },
+        {
+          "d1": null,
+          "d7": null,
+          "timestamp": "2025-11-10T00:00:00.000Z"
+        },
+        {
+          "d1": null,
+          "d7": null,
+          "timestamp": "2025-11-11T00:00:00.000Z"
+        },
+        {
+          "d1": null,
+          "d7": null,
+          "timestamp": "2025-11-12T00:00:00.000Z"
+        },
+        {
+          "d1": null,
+          "d7": null,
+          "timestamp": "2025-11-13T00:00:00.000Z"
+        }
+      ]
+    }
+  },
+  "fetched_at": "2025-11-13T21:46:43.601719"
+}

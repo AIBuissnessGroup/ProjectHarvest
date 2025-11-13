@@ -1,0 +1,101 @@
+# ============================================
+# Project Harvest - Docker Compose
+# ============================================
+# This file defines all services (containers) that work together
+
+version: '3.8'
+
+services:
+  # ==========================================
+  # FastAPI Application (Main Backend)
+  # ==========================================
+  api:
+    build: . # Build from Dockerfile in current directory
+    container_name: harvest-api # Name for easy reference
+    ports:
+      - "8000:8000" # Map port 8000 on your Mac to port 8000 in container
+    env_file:
+      - .env # Load environment variables from .env file
+    environment:
+      # Override some settings to use Docker service names
+      - POSTGRES_HOST=postgres # 'postgres' is the service name below
+      - REDIS_HOST=redis # 'redis' is the service name below
+    depends_on:
+      - redis # Start redis first
+      - postgres # Start postgres first
+    volumes:
+      # Mount local directories into container
+      # Changes on your Mac appear instantly in container
+      - ./app:/app/app # Sync code changes
+      - ./data:/app/data # Sync data files
+      - ./notebooks:/app/notebooks # Sync Jupyter notebooks
+    networks:
+      - harvest-network # All services on same network can talk to each other
+
+  # ==========================================
+  # Redis (Caching Service)
+  # ==========================================
+  redis:
+    image: redis:7-alpine # Use official Redis image (alpine = small)
+    container_name: harvest-redis
+    ports:
+      - "6379:6379" # Redis default port
+    volumes:
+      - redis_data:/data # Persist Redis data
+    networks:
+      - harvest-network
+
+  # ==========================================
+  # PostgreSQL (Database)
+  # ==========================================
+  postgres:
+    image: postgres:15-alpine # PostgreSQL 15 (alpine = small)
+    container_name: harvest-postgres
+    environment:
+      POSTGRES_DB: harvest # Database name
+      POSTGRES_USER: harvest_user # Username
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # From .env file
+    ports:
+      - "5432:5432" # PostgreSQL default port
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Persist database
+    networks:
+      - harvest-network
+
+  # ==========================================
+  # Jupyter Notebook (For ML Development)
+  # ==========================================
+  jupyter:
+    build: .
+    container_name: harvest-jupyter
+    ports:
+      - "8888:8888" # Jupyter runs on port 8888
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+    volumes:
+      - ./notebooks:/app/notebooks # Sync notebooks
+      - ./data:/app/data # Access data files
+      - ./app:/app/app # Access app code
+    networks:
+      - harvest-network
+    # Run Jupyter instead of FastAPI
+    command: jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''
+
+# ============================================
+# Named Volumes (Persistent Storage)
+# ============================================
+volumes:
+  redis_data: # Redis data persists between container restarts
+  postgres_data:
+    # Database persists between container restarts
+
+    # ============================================
+    # Network
+    # ============================================
+networks:
+  harvest-network:
+    # All services communicate on this network
+    driver: bridge
