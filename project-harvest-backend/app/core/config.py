@@ -4,7 +4,7 @@ Uses Pydantic for type-safe configuration management
 """
 
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Optional
 
 
 class Settings(BaseSettings):
@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     # Database Configuration
     # ============================================
     POSTGRES_USER: str = "harvest_user"
-    POSTGRES_PASSWORD: str  # Required - must be in .env
+    POSTGRES_PASSWORD: Optional[str] = "postgres"  # Optional for local dev
     POSTGRES_DB: str = "harvest"
     POSTGRES_HOST: str = "postgres"  # Docker service name
     POSTGRES_PORT: int = 5432
@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     FORTNITE_API_BASE: str = "https://api.fortnite.com/ecosystem/v1"
     
     # OpenAI API key for ChatGPT integration
-    OPENAI_API_KEY: str  # Required - must be in .env
+    OPENAI_API_KEY: Optional[str] = None  # Optional - needed for ChatGPT features
     
     # ============================================
     # Cache TTL (Time To Live) Settings
