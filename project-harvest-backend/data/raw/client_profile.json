@@ -1,0 +1,66 @@
+{
+  "maps": [
+    {
+      "code": "0038-9297-7629",
+      "name": "MANSION ESCAPE",
+      "type": "lego",
+      "peak_ccu": 346,
+      "current_ccu": 1,
+      "creator_followers": 2054196,
+      "version": 5,
+      "max_players": 6,
+      "primary_tag": "party game"
+    },
+    {
+      "code": "8310-4074-0791",
+      "name": "Escape The Forest",
+      "type": "lego",
+      "peak_ccu": 625,
+      "current_ccu": 2,
+      "creator_followers": 9511,
+      "version": 8,
+      "max_players": 4,
+      "primary_tag": "pve"
+    },
+    {
+      "code": "5689-5205-0912",
+      "name": "THE BRICKROOMS TYCOON",
+      "type": "lego",
+      "peak_ccu": 240,
+      "current_ccu": 0,
+      "creator_followers": 12830,
+      "version": 16,
+      "max_players": 4,
+      "primary_tag": "tycoon"
+    },
+    {
+      "code": "7048-0233-4310",
+      "name": "BRICK ISLAND: BOSSFIGHT \ud83d\udc7e",
+      "type": "lego",
+      "peak_ccu": 396,
+      "current_ccu": 1,
+      "creator_followers": 262077,
+      "version": 19,
+      "max_players": 4,
+      "primary_tag": "boss battle"
+    },
+    {
+      "code": "6522-1299-1581",
+      "name": "LEGO Treasure Extraction",
+      "type": "lego",
+      "peak_ccu": 370,
+      "current_ccu": 49,
+      "creator_followers": 74844,
+      "version": 10,
+      "max_players": 12,
+      "primary_tag": "free for all"
+    }
+  ],
+  "avg_peak_ccu": 395.4,
+  "avg_current_ccu": 10.6,
+  "avg_followers": 482691.6,
+  "peak_ccu_range": [
+    240,
+    625
+  ]
+}

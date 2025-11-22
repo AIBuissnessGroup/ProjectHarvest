@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api"
     PROJECT_NAME: str = "Project Harvest"
     VERSION: str = "0.1.0"
+    DEBUG: bool = True
     
     # CORS - Allow frontend to make requests
     # In production, limit this to specific domains
@@ -31,6 +32,7 @@ class Settings(BaseSettings):
         "http://localhost:3001",  # Alternative port
         "http://127.0.0.1:3000",
     ]
+    ALLOWED_ORIGINS: Optional[str] = None  # Comma-separated string from .env
     
     # ============================================
     # Database Configuration
@@ -73,6 +75,7 @@ class Settings(BaseSettings):
     # Cache TTL (Time To Live) Settings
     # ============================================
     # How long to cache API responses (in seconds)
+    CACHE_TTL: int = 3600  # General cache TTL from .env
     CACHE_TTL_ISLANDS: int = 3600      # 1 hour - island list doesn't change often
     CACHE_TTL_METRICS: int = 1800      # 30 minutes - metrics update more frequently
     CACHE_TTL_PREDICTIONS: int = 7200  # 2 hours - predictions are expensive to compute
@@ -91,6 +94,12 @@ class Settings(BaseSettings):
         """Pydantic configuration"""
         env_file = ".env"  # Load from .env file
         case_sensitive = True  # Environment variable names are case-sensitive
+    
+    def get_cors_origins(self) -> List[str]:
+        """Get CORS origins, using ALLOWED_ORIGINS from .env if provided"""
+        if self.ALLOWED_ORIGINS:
+            return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(',')]
+        return self.CORS_ORIGINS
 
 
 # Create a global settings instance
