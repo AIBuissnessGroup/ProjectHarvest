@@ -1,0 +1,11 @@
+{
+  "model_type": "future_ccu_prediction",
+  "best_model": "Random Forest",
+  "r2_score": 0.7552874962273659,
+  "mae": 45.6430232622467,
+  "rmse": 90.79695176572054,
+  "training_samples": 625,
+  "test_samples": 157,
+  "target": "future_ccu (7-day forecast)",
+  "date_trained": "2025-11-22T04:11:25.936900"
+}

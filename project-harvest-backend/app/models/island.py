@@ -252,6 +252,253 @@ class ErrorResponse(BaseModel):
 
 
 # ============================================
+# ML Prediction Models (Future CCU, Anomaly, Discovery)
+# ============================================
+
+class FutureCCURequest(BaseModel):
+    """Request for Future CCU prediction (7-day forecast)"""
+    map_code: str = Field(..., description="Map code (e.g., '8530-0110-2817')")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "map_code": "8530-0110-2817"
+            }
+        }
+
+
+class DailyForecast(BaseModel):
+    """Single day forecast"""
+    day: int = Field(..., description="Day number (1-7)")
+    predicted_ccu: int = Field(..., description="Predicted CCU for this day")
+    change_from_baseline: float = Field(..., description="% change from baseline")
+    confidence_lower: int = Field(..., description="Lower bound of prediction (confidence interval)")
+    confidence_upper: int = Field(..., description="Upper bound of prediction (confidence interval)")
+
+
+class FutureCCUResponse(BaseModel):
+    """Response for Future CCU prediction"""
+    map_code: str
+    map_name: str
+    current_ccu: int = Field(..., description="Current CCU")
+    baseline_ccu: float = Field(..., description="7-day average CCU")
+    predicted_ccu_7d: int = Field(..., description="Predicted CCU in 7 days")
+    daily_forecast: List[DailyForecast] = Field(default_factory=list, description="Day-by-day breakdown")
+    trend: str = Field(..., description="Growing, Declining, or Stable")
+    trend_strength: str = Field(..., description="Weak, Moderate, or Strong")
+    key_insights: List[str] = Field(default_factory=list, description="Key insights about the forecast")
+    confidence: str = Field(..., description="High, Medium, or Low")
+    model_metrics: Dict[str, float] = Field(..., description="Model R², MAE, RMSE")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "map_code": "8530-0110-2817",
+                "map_name": "Cool Arena Map",
+                "current_ccu": 5591,
+                "baseline_ccu": 7548,
+                "predicted_ccu_7d": 4820,
+                "daily_forecast": [
+                    {
+                        "day": 1,
+                        "predicted_ccu": 7200,
+                        "change_from_baseline": -4.6,
+                        "confidence_lower": 6800,
+                        "confidence_upper": 7600
+                    },
+                    {
+                        "day": 7,
+                        "predicted_ccu": 4820,
+                        "change_from_baseline": -36.1,
+                        "confidence_lower": 4400,
+                        "confidence_upper": 5240
+                    }
+                ],
+                "trend": "Declining",
+                "trend_strength": "Strong",
+                "key_insights": [
+                    "Steepest drop occurs on Days 6-7 (-12%)",
+                    "Consider campaign on Day 5 to prevent decline"
+                ],
+                "confidence": "High",
+                "model_metrics": {
+                    "r2_score": 0.76,
+                    "mae": 46,
+                    "rmse": 78
+                }
+            }
+        }
+
+
+class AnomalyDetectionRequest(BaseModel):
+    """Request for anomaly detection on map CCU data"""
+    map_code: str = Field(..., description="Map code to analyze")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "map_code": "8530-0110-2817"
+            }
+        }
+
+
+class AnomalyDetectionResponse(BaseModel):
+    """Response for anomaly detection"""
+    map_code: str
+    map_name: str
+    anomaly_score: float = Field(..., description="Anomaly score (lower = more anomalous)")
+    is_anomalous: bool = Field(..., description="Whether map shows anomalous behavior")
+    num_spikes: int = Field(..., description="Number of CCU spikes detected")
+    spike_details: List[Dict[str, Any]] = Field(default_factory=list, description="Details of each spike")
+    interpretation: str = Field(..., description="Human-readable interpretation")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "map_code": "8530-0110-2817",
+                "map_name": "Cool Arena Map",
+                "anomaly_score": -0.42,
+                "is_anomalous": True,
+                "num_spikes": 3,
+                "spike_details": [
+                    {"timestamp_index": 145, "ccu": 890, "z_score": 3.2}
+                ],
+                "interpretation": "Map shows 3 unusual CCU spikes. Possible campaign activity or viral moment."
+            }
+        }
+
+
+class DiscoveryPredictionRequest(BaseModel):
+    """Request for Discovery placement prediction"""
+    map_code: str = Field(..., description="Map code to analyze")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "map_code": "8530-0110-2817"
+            }
+        }
+
+
+class DiscoveryPredictionResponse(BaseModel):
+    """Response for Discovery prediction"""
+    map_code: str
+    map_name: str
+    discovery_probability: float = Field(..., description="Probability of hitting Discovery (0-100%)")
+    prediction: str = Field(..., description="YES or NO")
+    confidence: str = Field(..., description="High, Medium, or Low")
+    current_status: Dict[str, Any] = Field(..., description="Current map metrics")
+    strengths: List[str] = Field(default_factory=list, description="Positive factors")
+    weaknesses: List[str] = Field(default_factory=list, description="Negative factors")
+    recommendations: List[Dict[str, Any]] = Field(default_factory=list, description="Actionable recommendations")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "map_code": "8530-0110-2817",
+                "map_name": "Cool Arena Map",
+                "discovery_probability": 73.5,
+                "prediction": "YES",
+                "confidence": "High",
+                "current_status": {
+                    "avg_ccu_7d": 450,
+                    "growth_rate": 0.18,
+                    "creator_followers": 12500
+                },
+                "strengths": [
+                    "Strong upward momentum (+18% growth)",
+                    "CCU in Discovery range"
+                ],
+                "weaknesses": [
+                    "Creator follower count could be higher"
+                ],
+                "recommendations": [
+                    {
+                        "action": "Enable XP",
+                        "impact": "+15% probability",
+                        "priority": "high"
+                    }
+                ]
+            }
+        }
+
+
+class CompareMapsRequest(BaseModel):
+    """Request to compare multiple maps"""
+    map_codes: List[str] = Field(..., min_length=2, description="List of map codes to compare")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "map_codes": ["8530-0110-2817", "7048-0233-4310", "6522-1299-1581"]
+            }
+        }
+
+
+class CompareMapsResponse(BaseModel):
+    """Response for map comparison"""
+    comparison: str = Field(..., description="AI-generated comparison report")
+    rankings: Dict[str, List[Dict[str, Any]]] = Field(..., description="Rankings by different metrics")
+    summary_stats: Dict[str, Any] = Field(..., description="Summary statistics")
+
+
+# ============================================
+# Chat/AI Models
+# ============================================
+
+class ChatRequest(BaseModel):
+    """Request model for AI chat endpoint"""
+    message: str = Field(..., description="User's message/question", min_length=1, max_length=1000)
+    conversation_history: Optional[List[Dict[str, str]]] = Field(
+        None, 
+        description="Optional conversation history for context"
+    )
+    
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {
+                    "message": "What is the predicted peak CCU for map 1832-0431-4852?"
+                },
+                {
+                    "message": "Compare maps 1832-0431-4852 and 6562-8953-6567"
+                },
+                {
+                    "message": "Why is my map underperforming?"
+                }
+            ]
+        }
+
+
+class ChatResponse(BaseModel):
+    """Response model for AI chat endpoint"""
+    response: str = Field(..., description="AI-generated response")
+    function_called: Optional[str] = Field(None, description="Name of function that was triggered (if any)")
+    error: Optional[str] = Field(None, description="Error message if chat failed")
+
+
+class InsightsRequest(BaseModel):
+    """Request model for quick insights endpoint"""
+    map_code: str = Field(..., description="Map code to analyze (e.g., '1832-0431-4852')")
+
+
+class InsightsResponse(BaseModel):
+    """Response model for quick insights endpoint"""
+    map_code: str = Field(..., description="Map code that was analyzed")
+    map_name: Optional[str] = Field(None, description="Name of the map")
+    insights: str = Field(..., description="AI-generated insights and recommendations")
+    error: Optional[str] = Field(None, description="Error message if insights generation failed")
+
+
+class ChatHealthCheck(BaseModel):
+    """Response model for chat service health check"""
+    status: str = Field(..., description="Status of chat service ('available' or 'unavailable')")
+    service: str = Field(..., description="AI service being used (e.g., 'Google Gemini')")
+    configured: bool = Field(..., description="Whether API key is configured")
+    message: str = Field(..., description="Human-readable status message")
+
+
+# ============================================
 # Health Check Model
 # ============================================
 

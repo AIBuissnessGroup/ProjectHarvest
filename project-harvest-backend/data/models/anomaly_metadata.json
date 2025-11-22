@@ -1,0 +1,8 @@
+{
+  "model_type": "anomaly_detection",
+  "algorithm": "IsolationForest",
+  "contamination": 0.1,
+  "training_samples": 961,
+  "anomalies_detected": 96,
+  "date_trained": "2025-11-22T04:17:22.279218"
+}

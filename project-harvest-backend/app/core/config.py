@@ -66,8 +66,8 @@ class Settings(BaseSettings):
     # Fortnite API base URL
     FORTNITE_API_BASE: str = "https://api.fortnite.com/ecosystem/v1"
     
-    # OpenAI API key for ChatGPT integration
-    OPENAI_API_KEY: Optional[str] = None  # Optional - needed for ChatGPT features
+    # Google Gemini API key for AI chat integration (Free tier: 1500 requests/day)
+    GEMINI_API_KEY: Optional[str] = None  # Optional - needed for AI chat features
     
     # ============================================
     # Cache TTL (Time To Live) Settings

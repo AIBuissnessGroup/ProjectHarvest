@@ -79,13 +79,11 @@ async def health_check():
 # API Routes
 # ============================================
 
-from app.api.routes import islands, analytics
+from app.api.routes import islands, analytics, chat
 
 app.include_router(islands.router)
 app.include_router(analytics.router)
-
-# TODO: Add more routes:
-# - app.include_router(chat.router)
+app.include_router(chat.router)
 
 
 # ============================================
@@ -103,12 +101,15 @@ async def startup_event():
     print(f"📊 API available at: http://localhost:8000")
     print(f"📚 Docs available at: http://localhost:8000/api/docs")
     
-    # Load ML model
-    print("🤖 Loading ML prediction model...")
-    if ml_service.load_model():
-        print("✅ ML model loaded successfully!")
+    # ML models are loaded automatically in ml_service.__init__
+    print("🤖 ML models loaded on initialization")
+    
+    # Check chat service
+    print("💬 Checking AI chat service...")
+    if settings.GEMINI_API_KEY:
+        print("✅ Google Gemini configured and ready!")
     else:
-        print("⚠️  ML model failed to load - predictions will not be available")
+        print("⚠️  GEMINI_API_KEY not set - AI chat features will not be available")
 
 
 @app.on_event("shutdown")

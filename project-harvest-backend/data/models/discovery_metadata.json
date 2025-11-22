@@ -1,0 +1,13 @@
+{
+  "model_type": "discovery_classification",
+  "best_model": "Random Forest",
+  "accuracy": 0.900523560209424,
+  "precision": 0.9421965317919075,
+  "recall": 0.9476744186046512,
+  "f1_score": 0.9449275362318841,
+  "auc": 0.8675030599755202,
+  "training_samples": 762,
+  "test_samples": 191,
+  "discovery_rate": 0.8992654774396642,
+  "date_trained": "2025-11-22T04:19:45.866119"
+}
