@@ -1,6 +1,6 @@
 # Project Harvest
 
-AI-powered analytics platform for Fortnite Creative map activations. Built in collaboration between University of Michigan AI Business Group, Cherry Pick Talent, and Epic Games.
+AI-powered analytics platform for Fortnite Creative map activations. Built in collaboration between University of Michigan AI Business Group and Cherry Pick Talent.
 
 ![Project Harvest](harvest-ui/public/harvest-logo.png)
 
