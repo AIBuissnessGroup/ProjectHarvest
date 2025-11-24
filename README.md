@@ -272,7 +272,6 @@ python scripts/fetch_paginated_maps.py
 This project is a collaboration between:
 - **University of Michigan AI Business Group** - ML/AI Development
 - **Cherry Pick Talent** - Product Strategy & Requirements
-- **Epic Games** - Data Partnership
 
 ---
 
