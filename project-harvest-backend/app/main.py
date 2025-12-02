@@ -33,11 +33,16 @@ app.add_middleware(
         "http://localhost:3000",  # Next.js dev server
         "http://localhost:3001",
         "http://127.0.0.1:3000",
-        # Add production domains later
+        # Production domains
+        "https://*.vercel.app",  # Vercel preview deployments
+        "https://project-harvest.vercel.app",  # Main Vercel domain (update after deployment)
+        "https://projectharvest.vercel.app",
+        "https://harvest-ui.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
     allow_headers=["*"],  # Allow all headers
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Allow all Vercel subdomains
 )
 
 
