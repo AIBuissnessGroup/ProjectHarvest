@@ -119,7 +119,7 @@ What is the Discovery probability for map 6522-1299-1581?
 
 ### Backend `.env`
 ```env
-GEMINI_API_KEY=AIzaSyCHruG_Wi7l8AT9Xj6EFYhVsXU2SOEA72o
+GEMINI_API_KEY=AIzaSyCXnXOMulk6n8SWZ22yIjtGhwsn3h-377Y
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 POSTGRES_DB=harvest
@@ -144,7 +144,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 ### Start Backend
 ```bash
 cd project-harvest-backend
-GEMINI_API_KEY=AIzaSyCHruG_Wi7l8AT9Xj6EFYhVsXU2SOEA72o python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+GEMINI_API_KEY=AIzaSyCXnXOMulk6n8SWZ22yIjtGhwsn3h-377Y python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
 ### Start Frontend

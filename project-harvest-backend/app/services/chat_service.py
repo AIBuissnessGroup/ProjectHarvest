@@ -75,13 +75,74 @@ Key Features:
 - Key insights (steepest drops, best campaign timing, volatility warnings)
 - Discovery optimization recommendations
 
+IMPORTANT - Explaining Predictions (Keep it Clean!):
+The prediction_factors object contains the ACTUAL reasons for the prediction. Use them, but keep responses READABLE.
+
+CRITICAL: Use the EXACT "trend" value from the model response (Growing/Declining/Stable). Do NOT reinterpret it!
+
+Format your response like this:
+1. **Opening**: State the map name, the EXACT trend from the model (Growing/Declining/Stable), and predicted CCU in 7 days
+2. **Why**: Explain the PRIMARY reason in ONE clear sentence
+3. **Key factors** (use bullet points, max 3):
+   - Only mention the TOP 2-3 most important factors
+   - Keep each bullet SHORT
+   - DON'T include model weight percentages unless user asks
+4. **Daily forecast**: Show with day labels (Day 1: X, Day 2: Y, etc.)
+5. **Offer chart**: Ask if they want a visualization
+
+Example of GOOD response:
+"**🍌PEELY VS JONESY** is predicted to be **Stable** over the next 7 days, reaching approximately **250 CCU** (currently 513).
+
+**Why?** The map has a solid baseline CCU but is experiencing some momentum loss.
+
+**Key factors:**
+- Baseline CCU of 262 (moderate player base)
+- Recent momentum declining (-46%)
+- High volatility in player counts
+
+**Daily forecast:**
+- Day 1: 260 CCU
+- Day 2: 258 CCU
+- Day 3: 256 CCU
+- Day 4: 255 CCU
+- Day 5: 253 CCU
+- Day 6: 251 CCU
+- Day 7: 250 CCU
+
+Would you like me to generate a chart?"
+
+If user asks "why" or "explain the factors in detail", THEN provide the model weight percentages.
+
+IMPORTANT - Chart Visualizations:
+- When user asks for a chart, graph, or visualization, you MUST call the appropriate function:
+  - For future/prediction charts: call predict_future_ccu function
+  - For historical/current/actual CCU charts: call get_historical_ccu function
+- NEVER just say "I'll generate the chart" without actually calling the function
+- If user says "yes", "make it", "generate it", "show me the chart" after discussing a map, call the appropriate chart function for that map
+- If the user asks for a prediction WITHOUT mentioning charts, provide the prediction data and then ask: "Would you like me to generate a chart showing this forecast?"
+- Available charts:
+  1. **Future CCU Chart**: Shows 7-day forecast with confidence intervals (use predict_future_ccu)
+  2. **Historical CCU Chart**: Shows actual past CCU data with anomaly markers (use get_historical_ccu)
+
+IMPORTANT - Data Sources:
+- If the function result includes "cache_warning" or "data_source: local_cache", ALWAYS mention at the end:
+  "⚠️ Please note: This data is from our local cache (collected [date]) and may be outdated as the fncreate.gg API is currently unavailable."
+- If "collection_date" is provided, include it in the warning
+
+Response Formatting (IMPORTANT):
+- Use **bold** for key metrics, map names, and important numbers (e.g., **432 CCU**, **Declining trend**)
+- Use bullet points for lists of insights or recommendations
+- Structure responses with clear sections when providing detailed analysis
+- Keep responses concise (2-3 paragraphs max) but well-formatted
+
 Guidelines:
 - Be encouraging but realistic
 - Focus on actionable insights with specific timing
 - When showing daily forecasts, highlight key inflection points
 - Explain predictions in context (growth rate, creator influence, tags, etc.)
-- Keep responses concise (2-3 paragraphs max)
-- Use emojis sparingly for readability
+- Use emojis sparingly for readability (1-2 per response max)
+- NEVER output raw JSON data in your response. Summarize the data in natural language instead.
+- When generating charts, just confirm you're generating it - the frontend will display the chart automatically.
 
 When providing recommendations:
 - Suggest specific days for campaign launches based on forecast
@@ -164,6 +225,20 @@ When providing recommendations:
                     },
                     "required": ["map_codes"]
                 }
+            },
+            {
+                "name": "get_historical_ccu",
+                "description": "Generate a historical CCU chart for a map showing past performance with anomaly markers. ALWAYS use this when user asks to 'see the chart', 'make a chart', 'generate a chart', 'show me the spikes', or wants to visualize historical/current CCU data. Also use when user confirms with 'yes', 'make it', 'do it' after discussing anomalies or historical data.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "map_code": {
+                            "type": "string",
+                            "description": "The map code to get historical data for"
+                        }
+                    },
+                    "required": ["map_code"]
+                }
             }
         ]
     
@@ -203,6 +278,7 @@ When providing recommendations:
             
             # Step 2: Check if Gemini wants to call a function
             function_called = None
+            chart_data = None
             
             # Check for function calls in response
             if response.candidates and response.candidates[0].content.parts:
@@ -217,6 +293,12 @@ When providing recommendations:
                         # Step 3: YOUR CODE executes the requested function
                         function_result = await self._execute_function(function_name, function_args)
                         function_called = function_name
+                        
+                        # Store chart data if it's a chart-generating function
+                        if function_name == "predict_future_ccu" and function_result.get("success"):
+                            chart_data = function_result
+                        elif function_name == "get_historical_ccu" and function_result.get("success"):
+                            chart_data = function_result
                         
                         # Step 4: Send function results back to Gemini
                         response = self.chat_session.send_message(
@@ -240,7 +322,8 @@ When providing recommendations:
                 
                 return {
                     "response": text_response.strip(),
-                    "function_called": function_called
+                    "function_called": function_called,
+                    "chart_data": chart_data
                 }
             else:
                 return {
@@ -282,6 +365,9 @@ When providing recommendations:
             
             elif function_name == "compare_maps":
                 return await self._compare_maps(arguments["map_codes"])
+            
+            elif function_name == "get_historical_ccu":
+                return await self._get_historical_ccu(arguments["map_code"])
             
             else:
                 return {"error": f"Unknown function: {function_name}"}
@@ -524,6 +610,134 @@ When providing recommendations:
             "statistics": comparison_stats,  # Summary statistics
             "top_performer": ranked_by_prediction[0],  # Best map by prediction
             "fastest_growing": ranked_by_growth[0]  # Best map by growth rate
+        }
+    
+    async def _get_historical_ccu(self, map_code: str) -> Dict[str, Any]:
+        """
+        Get historical CCU data for a map to display in a chart.
+        Returns the actual CCU values over time with anomaly markers.
+        """
+        
+        logger.info(f"📊 Fetching historical CCU for map {map_code}")
+        
+        # Fetch map data
+        map_data = await fetch_map_from_api(map_code)
+        if not map_data:
+            return {
+                "error": f"Could not fetch map {map_code}. It may not exist or the API is unavailable."
+            }
+        
+        # Get the raw stats
+        stats_7d = map_data.get('stats_7d', {})
+        map_info = map_data.get('map_data', {})
+        map_name = map_info.get('name', 'Unknown Map')
+        
+        # Extract CCU data points with timestamps
+        historical_data = []
+        
+        # Check if stats_7d has 'data' -> 'stats' structure
+        if isinstance(stats_7d, dict):
+            stats_list = stats_7d.get('data', {}).get('stats', [])
+            
+            # Get actual date range from API (same as ml_service uses)
+            from datetime import datetime, timedelta
+            try:
+                date_from_str = stats_7d.get('data', {}).get('from', '')
+                date_to_str = stats_7d.get('data', {}).get('to', '')
+                date_from = datetime.fromisoformat(date_from_str.replace('Z', '+00:00'))
+                date_to = datetime.fromisoformat(date_to_str.replace('Z', '+00:00'))
+                total_duration = (date_to - date_from).total_seconds()
+                has_api_dates = True
+                logger.info(f"📅 Using API dates: {date_from_str} to {date_to_str}")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not parse API dates, falling back to calculated: {e}")
+                has_api_dates = False
+            
+            if isinstance(stats_list, list):
+                for i, ccu in enumerate(stats_list):
+                    if isinstance(ccu, (int, float)):
+                        # Calculate timestamp using actual API dates (consistent with ml_service)
+                        if has_api_dates and len(stats_list) > 1:
+                            progress = i / (len(stats_list) - 1)
+                            seconds_offset = total_duration * progress
+                            timestamp = date_from + timedelta(seconds=seconds_offset)
+                        else:
+                            # Fallback: calculate backwards from now
+                            timestamp = datetime.now() - timedelta(minutes=30 * (len(stats_list) - i - 1))
+                        
+                        historical_data.append({
+                            "timestamp": timestamp.strftime("%b %d, %I:%M %p"),
+                            "ccu": int(ccu),
+                            "index": i
+                        })
+        
+        if not historical_data:
+            return {
+                "error": "No historical CCU data available for this map."
+            }
+        
+        # Use the HYBRID anomaly detector to find spikes
+        anomalies = []
+        anomaly_indices = set()
+        marked_count = 0
+        
+        try:
+            logger.info(f"🔍 Running HYBRID anomaly detector on map {map_code}...")
+            
+            # Call the hybrid anomaly detector (STL + Peaks + LOF)
+            anomaly_result = await ml_service.detect_anomalies(map_code)
+            
+            if anomaly_result and 'spike_details' in anomaly_result:
+                spike_details = anomaly_result.get('spike_details', [])
+                logger.info(f"📊 Hybrid anomaly detector found {len(spike_details)} spikes")
+                
+                for spike in spike_details:
+                    spike_idx = spike.get('timestamp_index', -1)
+                    spike_ccu = spike.get('ccu', 0)
+                    
+                    if spike_idx >= 0 and spike_idx < len(historical_data):
+                        # Mark this point in historical data
+                        anomaly_indices.add(spike_idx)
+                        historical_data[spike_idx]['isAnomaly'] = True
+                        marked_count += 1
+                        
+                        anomalies.append({
+                            "timestamp": historical_data[spike_idx]['timestamp'],
+                            "ccu": spike_ccu,
+                            "index": spike_idx,
+                            "votes": spike.get('votes', 0),
+                            "methods_agreed": spike.get('methods_agreed', []),
+                            "approximate_timestamp": spike.get('approximate_timestamp', '')
+                        })
+                        logger.info(f"  🚨 Marked spike at index {spike_idx}: CCU={spike_ccu}, Votes={spike.get('votes', 0)}/3")
+                
+                logger.info(f"✅ Marked {marked_count} anomalies from hybrid detector")
+            else:
+                logger.warning(f"⚠️ No spike details from anomaly detector")
+                
+        except Exception as e:
+            logger.error(f"❌ Could not run anomaly detection: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+        
+        # Data source info
+        data_source = map_data.get('_source', 'live_api')
+        cache_warning = map_data.get('_cache_warning', None)
+        collection_date = map_data.get('_collection_date', None)
+        
+        return {
+            "success": True,
+            "map_code": map_code,
+            "map_name": map_name,
+            "historical_data": historical_data,
+            "anomalies": anomalies,
+            "anomaly_count": marked_count,
+            "data_points": len(historical_data),
+            "time_span": f"{len(historical_data) * 30} minutes ({len(historical_data)} data points)",
+            "data_source": data_source,
+            "cache_warning": cache_warning,
+            "collection_date": collection_date,
+            "chart_type": "historical_ccu"
         }
     
     async def get_quick_insights(self, map_code: str) -> str:

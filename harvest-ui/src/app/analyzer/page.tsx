@@ -27,6 +27,8 @@ import { WorkspaceCanvas } from "@/components/workspace/WorkspaceCanvas";
 import { chatAPI } from "@/lib/api-client";
 import type { ChatMessage as APIChatMessage } from "@/lib/api-client";
 import ReactMarkdown from 'react-markdown';
+import FutureCCUChart from "@/components/charts/FutureCCUChart";
+import HistoricalCCUChart from "@/components/charts/HistoricalCCUChart";
 
 export default function ProjectHarvest() {
   const [activePage, setActivePage] = useState("main");
@@ -56,12 +58,19 @@ export default function ProjectHarvest() {
   const [sidebarWidth, setSidebarWidth] = useState(384); // 384px = w-96
   const [isResizing, setIsResizing] = useState(false);
 
-  // Store messages per chat
-  const [chatMessages, setChatMessages] = useState<Record<string, Array<{ type: 'ai' | 'user', content: string }>>>({
+  // Store messages per chat (with optional chart data)
+  const [chatMessages, setChatMessages] = useState<Record<string, Array<{
+    type: 'ai' | 'user',
+    content: string,
+    chartData?: any // Store chart data for visualizations
+  }>>>({
     "chat-1": [
       { type: 'ai', content: "👋 **Welcome!** I'm your AI Analytics Assistant.\n\nI can analyze Fortnite Creative maps, predict future performance, detect anomalies, and much more.\n\nNot sure where to start? Just ask me what I'm capable of!" }
     ]
   });
+
+  // Store the latest prediction data for chart generation
+  const [latestChartData, setLatestChartData] = useState<any>(null);
 
   // Automatically set first chat as active when component mounts
   useEffect(() => {
@@ -69,6 +78,16 @@ export default function ProjectHarvest() {
       setActiveChat(chats[0].id);
     }
   }, [activeChat, chats]);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      const scrollElement = chatScrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollElement) {
+        scrollElement.scrollTop = scrollElement.scrollHeight;
+      }
+    }
+  }, [chatMessages, activeChat]);
 
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editingPageName, setEditingPageName] = useState("");
@@ -153,18 +172,166 @@ export default function ProjectHarvest() {
       // Call the backend API
       const response = await chatAPI.sendMessage(userMessage, conversationHistory);
 
-      // Add AI response to chat
-      setChatMessages(prev => ({
-        ...prev,
-        [activeChat]: [...(prev[activeChat] || []), { type: 'ai', content: response.response }]
-      }));
+      // Store chart data if the backend provided it
+      if (response.chart_data) {
+        setLatestChartData(response.chart_data);
+      }
 
-      // Auto-scroll to bottom
-      setTimeout(() => {
-        if (chatScrollRef.current) {
-          chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-        }
-      }, 100);
+      // Check if user is explicitly asking to see a chart AND we have fresh chart data from this response
+      const lowerMessage = userMessage.toLowerCase();
+      const lowerResponse = response.response?.toLowerCase() || '';
+      const hasNewChartData = response.chart_data && (
+        response.chart_data.daily_forecast || // Future CCU chart
+        response.chart_data.historical_data   // Historical CCU chart
+      );
+
+      // Check if Gemini said it's generating a chart
+      const geminiIsGeneratingChart =
+        lowerResponse.includes("generate the chart") ||
+        lowerResponse.includes("generating the chart") ||
+        lowerResponse.includes("i'll generate") ||
+        lowerResponse.includes("here is") ||
+        lowerResponse.includes("here's the chart") ||
+        lowerResponse.includes("chart for");
+
+      // Only show chart if:
+      // 1. User explicitly asked for a chart/graph AND we have new chart data from this response
+      // 2. OR user said "yes" or confirmed AND we have stored chart data
+      // 3. OR user is asking to "make it" / "do it" / "generate it" with stored data
+      // 4. OR Gemini says it's generating a chart AND we have chart data
+      const userExplicitlyAskedForChart =
+        (lowerMessage.includes('chart') || lowerMessage.includes('graph')) &&
+        (lowerMessage.includes('generate') || lowerMessage.includes('show') || lowerMessage.includes('create') || lowerMessage.includes('make'));
+
+      const userConfirmedChart = (
+        lowerMessage === 'yes' ||
+        lowerMessage === 'yes please' ||
+        lowerMessage === 'sure' ||
+        lowerMessage === 'ok' ||
+        lowerMessage === 'okay' ||
+        lowerMessage.includes('make it') ||
+        lowerMessage.includes('do it') ||
+        lowerMessage.includes('generate it') ||
+        lowerMessage.includes('show it') ||
+        lowerMessage.includes('create it')
+      ) && (latestChartData || hasNewChartData);
+
+      const userWantsChart = (userExplicitlyAskedForChart && hasNewChartData) || userConfirmedChart || (geminiIsGeneratingChart && hasNewChartData);
+
+      // Add chart to canvas if user requested it and we have data
+      // Use the NEW chart data from this response if available, otherwise use stored data
+      const chartDataToUse = hasNewChartData ? response.chart_data : latestChartData;
+
+      if (userWantsChart && chartDataToUse) {
+        // Find a free position for the new chart based on current viewport
+        const findFreePosition = () => {
+          const existingViz = pageVisualizations[activePage] || [];
+          const chartWidth = 550;
+          const chartHeight = 400;
+          const spacing = 20;
+
+          // Get current scroll position of the canvas to place chart in visible area
+          const canvasElement = document.querySelector('.workspace-canvas-scroll');
+          const scrollX = canvasElement?.scrollLeft || 0;
+          const scrollY = canvasElement?.scrollTop || 0;
+          const viewportWidth = canvasElement?.clientWidth || 1200;
+          const viewportHeight = canvasElement?.clientHeight || 800;
+
+          // Calculate visible area bounds
+          const visibleLeft = scrollX;
+          const visibleTop = scrollY;
+          const visibleRight = scrollX + viewportWidth;
+          const visibleBottom = scrollY + viewportHeight;
+
+          // Try positions in visible viewport first (3x2 grid in current view)
+          for (let row = 0; row < 2; row++) {
+            for (let col = 0; col < 3; col++) {
+              const testX = visibleLeft + spacing + col * (chartWidth + spacing);
+              const testY = visibleTop + spacing + row * (chartHeight + spacing);
+
+              // Make sure it fits in viewport
+              if (testX + chartWidth > visibleRight || testY + chartHeight > visibleBottom) {
+                continue;
+              }
+
+              // Check if this position overlaps with any existing chart
+              const overlaps = existingViz.some(viz => {
+                const overlapX = testX < viz.position.x + viz.size.width + spacing &&
+                  testX + chartWidth + spacing > viz.position.x;
+                const overlapY = testY < viz.position.y + viz.size.height + spacing &&
+                  testY + chartHeight + spacing > viz.position.y;
+                return overlapX && overlapY;
+              });
+
+              if (!overlaps) {
+                return { x: testX, y: testY, inViewport: true };
+              }
+            }
+          }
+
+          // If all visible positions taken, place in top-left of viewport
+          // (will scroll to it automatically)
+          if (existingViz.length > 0) {
+            return {
+              x: visibleLeft + spacing,
+              y: visibleTop + spacing,
+              inViewport: true
+            };
+          }
+
+          return { x: visibleLeft + spacing, y: visibleTop + spacing, inViewport: true };
+        };
+
+        const positionResult = findFreePosition();
+
+        // Determine chart type based on data
+        const chartType = chartDataToUse.chart_type === 'historical_ccu'
+          ? 'historical-ccu-chart'
+          : 'future-ccu-chart';
+
+        const newVisualization = {
+          id: `chart-${Date.now()}`,
+          type: chartType,
+          data: chartDataToUse,
+          position: { x: positionResult.x, y: positionResult.y },
+          size: { width: 550, height: 400 }
+        };
+
+        setPageVisualizations(prev => ({
+          ...prev,
+          [activePage]: [...(prev[activePage] || []), newVisualization]
+        }));
+
+        // Scroll to the new chart smoothly if not in viewport
+        setTimeout(() => {
+          const canvasElement = document.querySelector('.workspace-canvas-scroll');
+          if (canvasElement && positionResult.inViewport) {
+            canvasElement.scrollTo({
+              left: positionResult.x - 50,
+              top: positionResult.y - 50,
+              behavior: 'smooth'
+            });
+          }
+        }, 100);
+
+        // Add confirmation message to chat
+        setChatMessages(prev => ({
+          ...prev,
+          [activeChat]: [...(prev[activeChat] || []), {
+            type: 'ai',
+            content: response.response + "\n\n✅ **Chart added to canvas!** You can now drag, resize, and organize it on the dashboard."
+          }]
+        }));
+      } else {
+        // Add AI response to chat normally
+        setChatMessages(prev => ({
+          ...prev,
+          [activeChat]: [...(prev[activeChat] || []), {
+            type: 'ai',
+            content: response.response
+          }]
+        }));
+      }
 
     } catch (error) {
       console.error('Error sending message:', error);
@@ -480,7 +647,24 @@ export default function ProjectHarvest() {
                               p: ({ children }) => <p className="text-sm leading-relaxed text-slate-200 mb-3 last:mb-0">{children}</p>,
                               ul: ({ children }) => <ul className="text-sm text-slate-200 space-y-1 mb-3 list-disc list-inside">{children}</ul>,
                               ol: ({ children }) => <ol className="text-sm text-slate-200 space-y-1 mb-3 list-decimal list-inside">{children}</ol>,
-                              li: ({ children }) => <li className="text-sm text-slate-200">{children}</li>,
+                              li: ({ children }) => {
+                                // Check if this list item starts with "Day X:" pattern
+                                const childArray = Array.isArray(children) ? children : [children];
+                                const firstChild = childArray[0];
+                                if (typeof firstChild === 'string') {
+                                  const dayMatch = firstChild.match(/^(Day \d+:)(.*)$/);
+                                  if (dayMatch) {
+                                    return (
+                                      <li className="text-sm text-slate-200">
+                                        <span className="font-semibold text-brand-300">{dayMatch[1]}</span>
+                                        {dayMatch[2]}
+                                        {childArray.slice(1)}
+                                      </li>
+                                    );
+                                  }
+                                }
+                                return <li className="text-sm text-slate-200">{children}</li>;
+                              },
                               strong: ({ children }) => <strong className="font-semibold text-brand-300">{children}</strong>,
                               em: ({ children }) => <em className="italic text-slate-300">{children}</em>,
                               code: ({ children }) => <code className="bg-slate-900/50 px-1.5 py-0.5 rounded text-xs text-brand-300 font-mono">{children}</code>,
@@ -492,6 +676,7 @@ export default function ProjectHarvest() {
                             {message.content}
                           </ReactMarkdown>
                         </div>
+
                         {message.content.includes("created") && (
                           <div className="bg-brand-500/10 border border-brand-500/30 rounded-lg p-3 mt-3">
                             <p className="text-xs text-brand-300 font-medium">✓ Visualization added to canvas</p>
@@ -547,9 +732,13 @@ export default function ProjectHarvest() {
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSendMessage();
+                  }
+                }}
                 disabled={isSendingMessage}
-                placeholder="Ask about a map, predict CCU, detect anomalies, or compare maps..."
+                placeholder="Ask me about Fortnite Creative maps..."
                 className="flex-1 bg-slate-800 border border-brand-800/40 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 transition-all placeholder:text-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <Button
@@ -655,7 +844,33 @@ export default function ProjectHarvest() {
 
           {/* Workspace Canvas */}
           <div className="flex-1 overflow-hidden">
-            <WorkspaceCanvas key={activePage} pageId={activePage} />
+            <WorkspaceCanvas
+              key={activePage}
+              pageId={activePage}
+              visualizations={pageVisualizations[activePage] || []}
+              onRemove={(id) => {
+                setPageVisualizations(prev => ({
+                  ...prev,
+                  [activePage]: (prev[activePage] || []).filter(v => v.id !== id)
+                }));
+              }}
+              onPositionChange={(id, position) => {
+                setPageVisualizations(prev => ({
+                  ...prev,
+                  [activePage]: (prev[activePage] || []).map(v =>
+                    v.id === id ? { ...v, position } : v
+                  )
+                }));
+              }}
+              onSizeChange={(id, size) => {
+                setPageVisualizations(prev => ({
+                  ...prev,
+                  [activePage]: (prev[activePage] || []).map(v =>
+                    v.id === id ? { ...v, size } : v
+                  )
+                }));
+              }}
+            />
           </div>
         </div>
       </div>

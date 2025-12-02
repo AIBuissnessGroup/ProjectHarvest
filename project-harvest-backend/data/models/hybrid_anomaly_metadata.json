@@ -1,0 +1,23 @@
+{
+  "model_type": "hybrid_anomaly_detection",
+  "methods": [
+    "STL_decomposition",
+    "peak_prominence",
+    "local_outlier_factor"
+  ],
+  "min_votes": 2,
+  "grouping_window": 6,
+  "stl_period": 48,
+  "peak_prominence_percentile": 90,
+  "peak_distance": 6,
+  "lof_n_neighbors": 20,
+  "lof_contamination": 0.05,
+  "date_trained": "2025-12-01T19:11:58.963147",
+  "description": "Threshold-free hybrid anomaly detection using ensemble voting",
+  "test_results": {
+    "maps_tested": 50,
+    "old_method_total_spikes": 58,
+    "new_method_total_spikes": 157,
+    "improvement": 99
+  }
+}

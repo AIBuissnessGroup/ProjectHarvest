@@ -1,46 +1,61 @@
 "use client"
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, Grid3x3, Sparkles } from "lucide-react";
 import { VisualizationCard } from "./VisualizationCard";
+import FutureCCUChart from "@/components/charts/FutureCCUChart";
+import HistoricalCCUChart from "@/components/charts/HistoricalCCUChart";
+import DraggableChart from "./DraggableChart";
 
 interface Visualization {
     id: string;
-    title: string;
-    type: "chart" | "table" | "metric";
-    x: number;
-    y: number;
+    type: string;
+    data: any;
+    position: { x: number; y: number };
+    size: { width: number; height: number };
 }
 
 interface WorkspaceCanvasProps {
     pageId: string;
+    visualizations: Visualization[];
+    onRemove: (id: string) => void;
+    onPositionChange?: (id: string, position: { x: number; y: number }) => void;
+    onSizeChange?: (id: string, size: { width: number; height: number }) => void;
 }
 
-export function WorkspaceCanvas({ pageId }: WorkspaceCanvasProps) {
-    const [visualizations, setVisualizations] = useState<Visualization[]>([]);
+export function WorkspaceCanvas({ pageId, visualizations, onRemove, onPositionChange, onSizeChange }: WorkspaceCanvasProps) {
+    const canvasRef = useRef<HTMLDivElement>(null);
 
-    const handleRemove = (id: string) => {
-        setVisualizations(prev => prev.filter(v => v.id !== id));
-    };
+    // Center the canvas on mount
+    useEffect(() => {
+        if (canvasRef.current) {
+            const container = canvasRef.current;
+            const scrollX = (container.scrollWidth - container.clientWidth) / 2;
+            const scrollY = (container.scrollHeight - container.clientHeight) / 2;
+            container.scrollTo(scrollX, scrollY);
+        }
+    }, [pageId]); // Re-center when switching pages
 
     return (
-        <div className="relative w-full h-full bg-slate-950">
-            {/* Grid Background */}
-            <div
-                className="absolute inset-0 opacity-[0.07]"
-                style={{
-                    backgroundImage: `
-            linear-gradient(to right, #14b1e5 1px, transparent 1px),
-            linear-gradient(to bottom, #14b1e5 1px, transparent 1px)
-          `,
-                    backgroundSize: '40px 40px'
-                }}
-            />
+        <div ref={canvasRef} className="workspace-canvas-scroll relative w-full h-full bg-slate-950 overflow-auto">
+            {/* Infinite canvas container */}
+            <div className="relative" style={{ minWidth: '200%', minHeight: '200%' }}>
+                {/* Grid Background */}
+                <div
+                    className="absolute inset-0 opacity-[0.07] pointer-events-none"
+                    style={{
+                        backgroundImage: `
+                linear-gradient(to right, #14b1e5 1px, transparent 1px),
+                linear-gradient(to bottom, #14b1e5 1px, transparent 1px)
+              `,
+                        backgroundSize: '40px 40px'
+                    }}
+                />
 
-            {/* Empty State */}
-            {visualizations.length === 0 && (
-                <div className="absolute inset-0 flex items-center justify-center">
+                {/* Empty State */}
+                {visualizations.length === 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="text-center max-w-md">
                         <div className="w-20 h-20 bg-gradient-to-br from-brand-500/20 to-brand-600/20 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-brand-500/30 shadow-lg shadow-brand-500/10">
                             <Sparkles className="w-10 h-10 text-brand-400" />
@@ -64,22 +79,56 @@ export function WorkspaceCanvas({ pageId }: WorkspaceCanvasProps) {
                 </div>
             )}
 
-            {/* Visualizations */}
-            <div className="absolute inset-0 p-8">
-                {visualizations.map((viz) => (
-                    <div
-                        key={viz.id}
-                        className="absolute"
-                        style={{ left: viz.x, top: viz.y }}
-                    >
-                        <VisualizationCard
-                            id={viz.id}
-                            title={viz.title}
-                            type={viz.type}
-                            onRemove={() => handleRemove(viz.id)}
-                        />
-                    </div>
-                ))}
+                {/* Visualizations */}
+                {visualizations.map((viz) => {
+                    // Future CCU Chart
+                    if (viz.type === 'future-ccu-chart' && viz.data?.daily_forecast) {
+                        return (
+                            <DraggableChart
+                                key={viz.id}
+                                id={viz.id}
+                                initialPosition={viz.position}
+                                initialSize={viz.size}
+                                onPositionChange={onPositionChange}
+                                onSizeChange={onSizeChange}
+                                onRemove={onRemove}
+                            >
+                                <FutureCCUChart
+                                    dailyForecast={viz.data.daily_forecast}
+                                    baselineCCU={viz.data.baseline_ccu || 0}
+                                    currentCCU={viz.data.current_ccu || 0}
+                                    mapName={viz.data.map_name}
+                                    trend={viz.data.trend}
+                                    trendStrength={viz.data.trend_strength}
+                                />
+                            </DraggableChart>
+                        );
+                    }
+                    
+                    // Historical CCU Chart
+                    if (viz.type === 'historical-ccu-chart' && viz.data?.historical_data) {
+                        return (
+                            <DraggableChart
+                                key={viz.id}
+                                id={viz.id}
+                                initialPosition={viz.position}
+                                initialSize={viz.size}
+                                onPositionChange={onPositionChange}
+                                onSizeChange={onSizeChange}
+                                onRemove={onRemove}
+                            >
+                                <HistoricalCCUChart
+                                    data={viz.data.historical_data}
+                                    mapName={viz.data.map_name}
+                                    anomalies={viz.data.anomalies || []}
+                                    anomalyCount={viz.data.anomaly_count}
+                                />
+                            </DraggableChart>
+                        );
+                    }
+                    
+                    return null;
+                })}
             </div>
         </div>
     );

@@ -118,7 +118,8 @@ async def chat(request: ChatRequest):
         # Return successful response
         return ChatResponse(
             response=result["response"],
-            function_called=result.get("function_called")
+            function_called=result.get("function_called"),
+            chart_data=result.get("chart_data")
         )
     
     except Exception as e:

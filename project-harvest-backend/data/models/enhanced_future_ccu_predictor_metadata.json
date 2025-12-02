@@ -1,0 +1,38 @@
+{
+  "model_type": "Linear Regression",
+  "features": [
+    "baseline_ccu",
+    "trend_slope",
+    "recent_momentum",
+    "volatility",
+    "map_age_days",
+    "in_discovery",
+    "creator_followers",
+    "xp_enabled",
+    "num_tags",
+    "max_players",
+    "version",
+    "avg_session_length",
+    "retention_rate",
+    "favorites_count",
+    "recommendations_count",
+    "unique_players",
+    "total_plays",
+    "play_frequency",
+    "virality_score",
+    "engagement_per_player"
+  ],
+  "num_features": 20,
+  "fncreate_features": 11,
+  "fortnite_api_features": 9,
+  "r2_score": 0.8008029474604981,
+  "mae": 78.5779827338414,
+  "rmse": 400.14022955751034,
+  "training_samples": 760,
+  "test_samples": 190,
+  "trained_at": "2025-11-25T14:52:22.968826",
+  "data_sources": [
+    "fncreate.gg",
+    "fortnite_ecosystem_api"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "fetched_at": "2025-11-25T19:30:30.227190",
+  "total_maps": 962,
+  "successful": 960,
+  "not_found": 2,
+  "errors": 0,
+  "success_rate": "99.8%",
+  "data_directory": "/Users/nicholasrivera/project-harvest/project-harvest-backend/data/fortnite_metrics"
+}

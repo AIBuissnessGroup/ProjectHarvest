@@ -33,14 +33,14 @@
     "react-dom": "19.2.0",
     "react-markdown": "^9.0.1",
     "react-syntax-highlighter": "^15.5.0",
-    "recharts": "^3.3.0",
+    "recharts": "^3.5.1",
     "tailwind-merge": "^3.3.1",
     "zustand": "^4.5.0"
   },
   "devDependencies": {
     "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.21",
     "eslint": "^9",
     "eslint-config-next": "16.0.0",

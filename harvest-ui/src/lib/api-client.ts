@@ -66,7 +66,9 @@ export interface ChatMessage {
 
 export interface ChatResponse {
   response: string;
-  conversation_history: ChatMessage[];
+  conversation_history?: ChatMessage[];
+  chart_data?: any;
+  function_called?: string;
 }
 
 // ============================================

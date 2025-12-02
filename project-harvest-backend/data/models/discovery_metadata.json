@@ -9,5 +9,42 @@
   "training_samples": 762,
   "test_samples": 191,
   "discovery_rate": 0.8992654774396642,
-  "date_trained": "2025-11-22T04:19:45.866119"
+  "date_trained": "2025-11-22T04:19:45.866119",
+  "feature_importances": {
+    "type_encoded": 0.02671720612386055,
+    "tag_encoded": 0.07469913436605968,
+    "num_tags": 0.002431446295032753,
+    "max_players": 0.024827081712426195,
+    "xp_enabled": 0.005841399071071812,
+    "creator_followers": 0.05650480729767615,
+    "version": 0.04197636696383002,
+    "map_age_days": 0.05500160894621982,
+    "avg_ccu_7d": 0.19125847653265232,
+    "peak_ccu_7d": 0.2414968455597742,
+    "ccu_growth_rate": 0.06204528989421106,
+    "ccu_volatility": 0.0644891584676673,
+    "current_ccu": 0.15271117876951823
+  },
+  "feature_columns": [
+    "type_encoded",
+    "tag_encoded",
+    "num_tags",
+    "max_players",
+    "xp_enabled",
+    "creator_followers",
+    "version",
+    "map_age_days",
+    "avg_ccu_7d",
+    "peak_ccu_7d",
+    "ccu_growth_rate",
+    "ccu_volatility",
+    "current_ccu"
+  ],
+  "top_features": [
+    "peak_ccu_7d",
+    "avg_ccu_7d",
+    "current_ccu",
+    "tag_encoded",
+    "ccu_volatility"
+  ]
 }

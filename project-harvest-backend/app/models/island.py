@@ -474,6 +474,7 @@ class ChatResponse(BaseModel):
     """Response model for AI chat endpoint"""
     response: str = Field(..., description="AI-generated response")
     function_called: Optional[str] = Field(None, description="Name of function that was triggered (if any)")
+    chart_data: Optional[Dict[str, Any]] = Field(None, description="Chart data if prediction was made (for visualization)")
     error: Optional[str] = Field(None, description="Error message if chat failed")
 
 

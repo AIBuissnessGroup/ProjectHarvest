@@ -3,7 +3,7 @@ ML Service - Unified service for all ML models
 ===============================================
 Handles loading and predictions for:
 1. Future CCU Prediction (7-day forecast)
-2. Anomaly Detection (campaign spikes)
+2. Anomaly Detection (campaign spikes) - Using Hybrid Method
 3. Discovery Probability (placement prediction)
 """
 
@@ -11,7 +11,13 @@ import joblib
 import numpy as np
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
+
+# Hybrid Anomaly Detection imports
+from scipy.signal import find_peaks
+from statsmodels.tsa.seasonal import STL
+from sklearn.neighbors import LocalOutlierFactor
+from sklearn.preprocessing import StandardScaler
 
 from app.services.fncreate_service import fetch_map_from_api
 
@@ -63,22 +69,21 @@ class MLService:
             else:
                 print("⚠️  Future CCU model not found - train with notebooks/train_future_ccu_model.ipynb")
             
-            # Anomaly Detector
-            anomaly_path = self.models_dir / "anomaly_detector.pkl"
-            if anomaly_path.exists():
+            # Anomaly Detector - Now using HYBRID method (no model file needed)
+            # The hybrid method uses STL + Peak Prominence + LOF on-the-fly
+            print("✅ Anomaly detector ready (hybrid method: STL + Peaks + LOF)")
+            
+            # Load hybrid metadata if available
+            hybrid_metadata_path = self.models_dir / "hybrid_anomaly_metadata.json"
+            if hybrid_metadata_path.exists():
                 try:
-                    self.anomaly_model = joblib.load(anomaly_path)
-                    self.anomaly_scaler = joblib.load(self.models_dir / "anomaly_scaler.pkl")
-                    
                     import json
-                    with open(self.models_dir / "anomaly_metadata.json") as f:
+                    with open(hybrid_metadata_path) as f:
                         self.anomaly_metadata = json.load(f)
-                    
-                    print("✅ Anomaly detector loaded")
-                except Exception as e:
-                    print(f"⚠️  Error loading Anomaly detector: {e}")
+                except:
+                    self.anomaly_metadata = {"model_type": "hybrid_anomaly_detection"}
             else:
-                print("⚠️  Anomaly detector not found - train with notebooks/train_anomaly_detector.ipynb")
+                self.anomaly_metadata = {"model_type": "hybrid_anomaly_detection"}
             
             # Discovery Predictor
             discovery_path = self.models_dir / "discovery_predictor.pkl"
@@ -100,7 +105,7 @@ class MLService:
             # Summary
             models_loaded = sum([
                 self.future_ccu_model is not None,
-                self.anomaly_model is not None,
+                True,  # Anomaly detector always ready (hybrid method)
                 self.discovery_model is not None
             ])
             print(f"\n📊 ML Models loaded: {models_loaded}/3")
@@ -129,6 +134,11 @@ class MLService:
         map_data = await fetch_map_from_api(map_code)
         if not map_data:
             raise ValueError(f"Map {map_code} not found")
+        
+        # Check if using cached data
+        data_source = map_data.get('_source', 'unknown')
+        cache_warning = map_data.get('_cache_warning', '')
+        collection_date = map_data.get('_collection_date', 'Unknown')
         
         # Extract features
         features = self._extract_future_ccu_features(map_data)
@@ -190,7 +200,10 @@ class MLService:
         # Confidence (based on prediction range)
         confidence = "High" if abs(total_change_pct) < 30 else "Medium"
         
-        return {
+        # Generate explanation of key factors driving the prediction
+        prediction_factors = self._analyze_prediction_factors(features, trend, trend_slope)
+        
+        result = {
             "map_code": map_code,
             "map_name": map_data['map_data'].get('name', 'Unknown'),
             "current_ccu": current_ccu,
@@ -201,12 +214,34 @@ class MLService:
             "trend_strength": trend_strength,
             "key_insights": key_insights,
             "confidence": confidence,
+            "prediction_factors": prediction_factors,  # NEW: explains WHY the prediction is what it is
+            "map_features": {  # NEW: raw feature values for transparency
+                "creator_followers": features.get('creator_followers', 0),
+                "map_age_days": features.get('map_age_days', 0),
+                "xp_enabled": bool(features.get('xp_enabled', 0)),
+                "in_discovery": bool(features.get('in_discovery', 0)),
+                "max_players": features.get('max_players', 0),
+                "num_tags": features.get('num_tags', 0),
+                "primary_tag": features.get('primary_tag', 'unknown'),
+                "trend_slope_pct": round(trend_slope, 1),
+                "volatility": round(features.get('volatility', 0), 2),
+                "recent_momentum_pct": round(features.get('recent_momentum', 0), 1)
+            },
             "model_metrics": {
                 "r2_score": self.future_ccu_metadata.get('r2_score', 0),
                 "mae": self.future_ccu_metadata.get('mae', 0),
                 "rmse": self.future_ccu_metadata.get('rmse', 0)
-            }
+            },
+            "data_source": data_source
         }
+        
+        # Add warning if using cached data
+        if data_source == 'local_cache':
+            if cache_warning:
+                result['cache_warning'] = cache_warning
+            result['collection_date'] = collection_date
+        
+        return result
     
     def _generate_daily_insights(self, daily_forecast: List[Dict], trend: str, baseline_ccu: float) -> List[str]:
         """Generate key insights from daily forecast"""
@@ -259,6 +294,173 @@ class MLService:
             insights.append(f"Week-over-week {direction} of {abs(week_change):.0f}% expected")
         
         return insights[:4]  # Return top 4 insights
+    
+    def _analyze_prediction_factors(self, features: Dict[str, Any], trend: str, trend_slope: float) -> Dict[str, Any]:
+        """
+        Analyze and explain the key factors driving the CCU prediction.
+        Uses ACTUAL feature importances from the trained model.
+        
+        Feature Importances (from Random Forest model):
+        - baseline_ccu: 66.4% (most important!)
+        - trend_slope: 17.9%
+        - recent_momentum: 9.8%
+        - creator_followers: 1.7%
+        - volatility: 1.3%
+        - Others: <1% each
+        """
+        # Get actual feature importances from metadata
+        feature_importances = self.future_ccu_metadata.get('feature_importances', {})
+        
+        # Build factor contributions with actual importance weights
+        factor_contributions = []
+        
+        # 1. Baseline CCU (66.4% importance)
+        baseline = features.get('baseline_ccu', 0)
+        baseline_imp = feature_importances.get('baseline_ccu', 0.664) * 100
+        if baseline > 0:
+            if baseline > 300:
+                direction = "positive"
+                explanation = f"Strong baseline CCU ({baseline:.0f} avg)"
+            elif baseline > 100:
+                direction = "neutral"
+                explanation = f"Moderate baseline CCU ({baseline:.0f} avg)"
+            else:
+                direction = "negative"
+                explanation = f"Low baseline CCU ({baseline:.0f} avg)"
+            
+            factor_contributions.append({
+                "feature": "baseline_ccu",
+                "importance": baseline_imp,
+                "value": baseline,
+                "direction": direction,
+                "explanation": explanation
+            })
+        
+        # 2. Trend Slope (17.9% importance)
+        trend_imp = feature_importances.get('trend_slope', 0.179) * 100
+        if trend_slope > 5:
+            direction = "positive"
+            explanation = f"Upward trend (+{trend_slope:.1f}%)"
+        elif trend_slope < -5:
+            direction = "negative"
+            explanation = f"Downward trend ({trend_slope:.1f}%)"
+        else:
+            direction = "neutral"
+            explanation = f"Stable trend ({trend_slope:+.1f}%)"
+        
+        factor_contributions.append({
+            "feature": "trend_slope",
+            "importance": trend_imp,
+            "value": trend_slope,
+            "direction": direction,
+            "explanation": explanation
+        })
+        
+        # 3. Recent Momentum (9.8% importance)
+        momentum = features.get('recent_momentum', 0)
+        momentum_imp = feature_importances.get('recent_momentum', 0.098) * 100
+        if momentum > 10:
+            direction = "positive"
+            explanation = f"Strong recent momentum (+{momentum:.1f}%)"
+        elif momentum > 0:
+            direction = "positive"
+            explanation = f"Positive momentum (+{momentum:.1f}%)"
+        elif momentum < -10:
+            direction = "negative"
+            explanation = f"Losing momentum ({momentum:.1f}%)"
+        elif momentum < 0:
+            direction = "negative"
+            explanation = f"Slight momentum loss ({momentum:.1f}%)"
+        else:
+            direction = "neutral"
+            explanation = "Flat momentum (0%)"
+        
+        factor_contributions.append({
+            "feature": "recent_momentum",
+            "importance": momentum_imp,
+            "value": momentum,
+            "direction": direction,
+            "explanation": explanation
+        })
+        
+        # 4. Creator Followers (1.7% importance)
+        followers = features.get('creator_followers', 0)
+        followers_imp = feature_importances.get('creator_followers', 0.017) * 100
+        if followers > 10000:
+            direction = "positive"
+            explanation = f"Large following ({followers:,} followers)"
+        elif followers > 1000:
+            direction = "neutral"
+            explanation = f"Moderate following ({followers:,} followers)"
+        else:
+            direction = "negative"
+            explanation = f"Small following ({followers:,} followers)"
+        
+        factor_contributions.append({
+            "feature": "creator_followers",
+            "importance": followers_imp,
+            "value": followers,
+            "direction": direction,
+            "explanation": explanation
+        })
+        
+        # 5. Volatility (1.3% importance)
+        volatility = features.get('volatility', 0)
+        volatility_imp = feature_importances.get('volatility', 0.013) * 100
+        if volatility > 0.5:
+            direction = "negative"
+            explanation = f"High volatility ({volatility:.2f})"
+        elif volatility < 0.2:
+            direction = "positive"
+            explanation = f"Low volatility ({volatility:.2f})"
+        else:
+            direction = "neutral"
+            explanation = f"Moderate volatility ({volatility:.2f})"
+        
+        factor_contributions.append({
+            "feature": "volatility",
+            "importance": volatility_imp,
+            "value": volatility,
+            "direction": direction,
+            "explanation": explanation
+        })
+        
+        # Sort by importance (highest first)
+        factor_contributions.sort(key=lambda x: -x['importance'])
+        
+        # Identify primary driver (highest importance factor that's not neutral)
+        primary_driver = None
+        for factor in factor_contributions:
+            if factor['direction'] != 'neutral':
+                primary_driver = factor
+                break
+        
+        if not primary_driver:
+            primary_driver = factor_contributions[0]  # Default to most important
+        
+        # Build summary
+        primary_explanation = f"{primary_driver['explanation']} ({primary_driver['importance']:.1f}% model weight)"
+        
+        # Separate positive and negative factors
+        positive_factors = [f for f in factor_contributions if f['direction'] == 'positive']
+        negative_factors = [f for f in factor_contributions if f['direction'] == 'negative']
+        
+        return {
+            "primary_driver": primary_explanation,
+            "primary_feature": primary_driver['feature'],
+            "primary_importance": primary_driver['importance'],
+            "all_factors": factor_contributions,
+            "positive_factors": [
+                f"{f['explanation']} ({f['importance']:.1f}% weight)" 
+                for f in positive_factors
+            ],
+            "negative_factors": [
+                f"{f['explanation']} ({f['importance']:.1f}% weight)" 
+                for f in negative_factors
+            ],
+            "summary": f"Prediction is {trend.lower()} - primary driver: {primary_explanation}",
+            "model_insight": "The model weighs baseline CCU (66.4%), trend slope (17.9%), and recent momentum (9.8%) as the top 3 factors."
+        }
     
     def _extract_future_ccu_features(self, map_data: Dict[str, Any]) -> Dict[str, Any]:
         """Extract features for future CCU prediction"""
@@ -384,26 +586,35 @@ class MLService:
         return [feature_dict[col] for col in feature_columns]
     
     # =============================================
-    # Anomaly Detection
+    # Anomaly Detection (Hybrid Method)
     # =============================================
     
     async def detect_anomalies(self, map_code: str) -> Dict[str, Any]:
         """
-        Detect CCU anomalies/spikes for a map
+        Detect CCU anomalies/spikes for a map using HYBRID method.
+        
+        Combines 3 threshold-free methods:
+        1. STL Decomposition + IQR
+        2. Peak Prominence Detection
+        3. Local Outlier Factor (LOF)
+        
+        Only flags as anomaly if 2+ methods agree.
         
         Args:
             map_code: Map code
             
         Returns:
-            Dict with anomaly score, spikes, interpretation
+            Dict with anomaly details, spikes, interpretation
         """
-        if not self.anomaly_model:
-            raise ValueError("Anomaly detector not loaded")
-        
         # Fetch map data
         map_data = await fetch_map_from_api(map_code)
         if not map_data:
             raise ValueError(f"Map {map_code} not found")
+        
+        # Check if using cached data
+        data_source = map_data.get('_source', 'unknown')
+        cache_warning = map_data.get('_cache_warning', '')
+        collection_date = map_data.get('_collection_date', 'Unknown')
         
         # Extract time-series
         stats_7d = map_data.get('stats_7d', {})
@@ -414,71 +625,250 @@ class MLService:
         if len(ccu_series) < 50:
             raise ValueError("Insufficient data for anomaly detection")
         
-        # Statistical anomaly detection
-        spike_indices, spike_scores, num_spikes = self._detect_statistical_anomalies(ccu_series)
+        # Get date range for timestamp calculation
+        try:
+            date_from_str = stats_7d.get('data', {}).get('from', '')
+            date_to_str = stats_7d.get('data', {}).get('to', '')
+            date_from = datetime.fromisoformat(date_from_str.replace('Z', '+00:00'))
+            date_to = datetime.fromisoformat(date_to_str.replace('Z', '+00:00'))
+            total_duration = (date_to - date_from).total_seconds()
+            has_timestamps = True
+        except:
+            has_timestamps = False
+            date_from = None
+            total_duration = 0
         
-        # ML-based anomaly detection
-        features = self._extract_anomaly_features(ccu_series)
-        X_scaled = self.anomaly_scaler.transform([features])
-        anomaly_score = float(self.anomaly_model.score_samples(X_scaled)[0])
-        is_anomalous = self.anomaly_model.predict(X_scaled)[0] == -1
+        # Run HYBRID anomaly detection
+        hybrid_result = self._detect_anomalies_hybrid(ccu_series)
         
-        # Build spike details
+        spike_indices = hybrid_result['spike_indices']
+        spike_details_raw = hybrid_result['spike_details']
+        num_spikes = hybrid_result['num_spikes']
+        
+        # Determine if map is anomalous based on hybrid detection
+        is_anomalous = num_spikes > 0
+        
+        # Calculate anomaly score based on spike characteristics
+        if num_spikes > 0:
+            avg_votes = np.mean([s['votes'] for s in spike_details_raw])
+            anomaly_score = -0.5 - (avg_votes / 3) * 0.5  # More negative = more anomalous
+        else:
+            anomaly_score = 0.1  # Normal
+        
+        # Build spike details with approximate timestamps
         spike_details = []
-        for idx, score in zip(spike_indices, spike_scores):
-            spike_details.append({
+        for spike in spike_details_raw:
+            idx = spike['peak_index']
+            spike_detail = {
                 "timestamp_index": int(idx),
-                "ccu": int(ccu_series[idx]),
-                "z_score": float(score)
-            })
+                "ccu": spike['peak_ccu'],
+                "votes": spike['votes'],
+                "methods_agreed": spike['methods_agreed']
+            }
+            
+            # Calculate approximate timestamp
+            if has_timestamps and len(ccu_series) > 1 and date_from:
+                progress = idx / (len(ccu_series) - 1)
+                seconds_offset = total_duration * progress
+                spike_time = date_from + timedelta(seconds=seconds_offset)
+                spike_detail["approximate_timestamp"] = spike_time.strftime('%B %d, %Y at %I:%M %p')
+                spike_detail["date"] = spike_time.strftime('%Y-%m-%d')
+            
+            spike_details.append(spike_detail)
         
         # Interpretation
-        if is_anomalous and num_spikes > 0:
-            interpretation = f"Map shows {num_spikes} unusual CCU spike(s). Possible campaign activity or viral moment."
-        elif is_anomalous:
-            interpretation = "Map shows unusual CCU patterns. Investigate recent activity."
+        if num_spikes > 0:
+            methods_used = set()
+            for s in spike_details_raw:
+                methods_used.update(s['methods_agreed'])
+            interpretation = f"Map shows {num_spikes} unusual CCU spike(s) detected by hybrid analysis ({', '.join(methods_used)}). Possible campaign activity or viral moment."
         else:
-            interpretation = "Map shows normal CCU behavior. No significant anomalies detected."
+            interpretation = "Map shows normal CCU behavior. No significant anomalies detected by hybrid analysis."
         
-        return {
+        result = {
             "map_code": map_code,
             "map_name": map_data['map_data'].get('name', 'Unknown'),
             "anomaly_score": anomaly_score,
             "is_anomalous": bool(is_anomalous),
             "num_spikes": num_spikes,
-            "spike_details": spike_details[:10],  # Limit to 10 most significant
-            "interpretation": interpretation
+            "spike_details": spike_details[:10],
+            "interpretation": interpretation,
+            "detection_method": "hybrid",
+            "methods_used": ["STL", "peak_prominence", "LOF"],
+            "data_source": data_source
+        }
+        
+        # Add warning if using cached data
+        if data_source == 'local_cache':
+            if cache_warning:
+                result['cache_warning'] = cache_warning
+            result['collection_date'] = collection_date
+        
+        return result
+    
+    def _detect_anomalies_hybrid(self, ccu_series: List[float], min_votes: int = 2, grouping_window: int = 6) -> Dict[str, Any]:
+        """
+        Hybrid anomaly detection using ensemble of 3 methods.
+        Only flags as anomaly if min_votes methods agree.
+        
+        Methods:
+        1. STL Decomposition + IQR on residuals
+        2. Peak Prominence (scipy find_peaks)
+        3. Local Outlier Factor (LOF)
+        """
+        arr = np.array(ccu_series, dtype=float)
+        n_points = len(arr)
+        
+        # Initialize vote counter for each point
+        votes = np.zeros(n_points, dtype=int)
+        method_results = {}
+        
+        # Method 1: STL Decomposition + IQR
+        try:
+            stl_indices = self._detect_anomalies_stl(ccu_series)
+            for idx in stl_indices:
+                votes[idx] += 1
+            method_results['STL'] = stl_indices
+        except Exception as e:
+            method_results['STL'] = []
+        
+        # Method 2: Peak Prominence
+        try:
+            peak_indices = self._detect_anomalies_peaks(ccu_series)
+            for idx in peak_indices:
+                votes[idx] += 1
+            method_results['peak_prominence'] = peak_indices
+        except Exception as e:
+            method_results['peak_prominence'] = []
+        
+        # Method 3: Local Outlier Factor
+        try:
+            lof_indices = self._detect_anomalies_lof(ccu_series)
+            for idx in lof_indices:
+                votes[idx] += 1
+            method_results['LOF'] = lof_indices
+        except Exception as e:
+            method_results['LOF'] = []
+        
+        # Find points with enough votes
+        consensus_indices = np.where(votes >= min_votes)[0].tolist()
+        
+        # Group nearby anomalies into spike events
+        if not consensus_indices:
+            return {
+                'spike_indices': [],
+                'spike_details': [],
+                'num_spikes': 0,
+                'method_results': method_results,
+                'votes': votes
+            }
+        
+        # Group consecutive/nearby indices into spike events
+        spike_events = []
+        current_spike = [consensus_indices[0]]
+        
+        for idx in consensus_indices[1:]:
+            if idx - current_spike[-1] <= grouping_window:
+                current_spike.append(idx)
+            else:
+                spike_events.append(current_spike)
+                current_spike = [idx]
+        spike_events.append(current_spike)
+        
+        # For each spike event, get the PEAK (highest CCU)
+        spike_details = []
+        spike_indices = []
+        
+        for spike_group in spike_events:
+            peak_idx = max(spike_group, key=lambda i: arr[i])
+            spike_indices.append(peak_idx)
+            
+            spike_details.append({
+                'peak_index': peak_idx,
+                'peak_ccu': int(arr[peak_idx]),
+                'votes': int(votes[peak_idx]),
+                'spike_duration_indices': len(spike_group),
+                'methods_agreed': [
+                    m for m, indices in method_results.items() 
+                    if any(i in spike_group for i in indices)
+                ]
+            })
+        
+        return {
+            'spike_indices': spike_indices,
+            'spike_details': spike_details,
+            'num_spikes': len(spike_indices),
+            'method_results': method_results,
+            'votes': votes
         }
     
-    def _detect_statistical_anomalies(self, ccu_series: List[float], threshold: float = 2.5) -> Tuple[List[int], List[float], int]:
-        """Detect anomalies using Z-score"""
-        arr = np.array(ccu_series)
-        mean = np.mean(arr)
-        std = np.std(arr)
+    def _detect_anomalies_stl(self, ccu_series: List[float], period: int = 48) -> List[int]:
+        """
+        Detect anomalies using STL decomposition + IQR on residuals.
+        Period of 48 = 24 hours at 30-min intervals.
+        """
+        arr = np.array(ccu_series, dtype=float)
         
-        if std == 0:
-            return [], [], 0
+        if len(arr) < period * 2:
+            return []
         
-        z_scores = np.abs((arr - mean) / std)
-        anomaly_indices = np.where(z_scores > threshold)[0]
-        anomaly_scores = z_scores[anomaly_indices]
+        # STL decomposition
+        stl = STL(arr, period=period, robust=True)
+        result = stl.fit()
+        residuals = result.resid
         
-        return anomaly_indices.tolist(), anomaly_scores.tolist(), len(anomaly_indices)
+        # Use IQR to find anomalies in residuals
+        Q1 = np.percentile(residuals, 25)
+        Q3 = np.percentile(residuals, 75)
+        IQR = Q3 - Q1
+        upper_bound = Q3 + 1.5 * IQR
+        
+        anomaly_indices = np.where(residuals > upper_bound)[0].tolist()
+        return anomaly_indices
     
-    def _extract_anomaly_features(self, ccu_series: List[float]) -> List[float]:
-        """Extract statistical features for anomaly detection"""
-        arr = np.array(ccu_series)
+    def _detect_anomalies_peaks(self, ccu_series: List[float], prominence_percentile: int = 90, distance: int = 6) -> List[int]:
+        """
+        Detect anomalies using scipy find_peaks with prominence.
+        Only keeps peaks with prominence above the given percentile.
+        """
+        arr = np.array(ccu_series, dtype=float)
         
-        return [
-            float(np.mean(arr)),
-            float(np.std(arr)),
-            float(np.max(arr)),
-            float(np.min(arr)),
-            float(np.max(arr) - np.mean(arr)),  # Peak deviation
-            float(np.std(arr) / max(np.mean(arr), 1)),  # Coefficient of variation
-            float(np.max(np.diff(arr))),  # Max jump
-            float(np.percentile(arr, 95)),  # 95th percentile
-        ]
+        # Find ALL peaks first
+        all_peaks, properties = find_peaks(arr, distance=distance, prominence=1)
+        
+        if len(all_peaks) == 0:
+            return []
+        
+        prominences = properties['prominences']
+        
+        # Only keep peaks with high prominence
+        prominence_threshold = np.percentile(prominences, prominence_percentile)
+        significant_mask = prominences >= prominence_threshold
+        anomaly_indices = all_peaks[significant_mask].tolist()
+        
+        return anomaly_indices
+    
+    def _detect_anomalies_lof(self, ccu_series: List[float], n_neighbors: int = 20, contamination: float = 0.05) -> List[int]:
+        """
+        Detect anomalies using Local Outlier Factor.
+        """
+        arr = np.array(ccu_series, dtype=float).reshape(-1, 1)
+        
+        # Add time index as a feature
+        time_idx = np.arange(len(arr)).reshape(-1, 1)
+        X = np.hstack([arr, time_idx])
+        
+        # Normalize
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+        
+        # LOF
+        lof = LocalOutlierFactor(n_neighbors=n_neighbors, contamination=contamination)
+        labels = lof.fit_predict(X_scaled)
+        
+        # Anomalies are labeled as -1
+        anomaly_indices = np.where(labels == -1)[0].tolist()
+        return anomaly_indices
     
     # =============================================
     # Discovery Prediction
@@ -501,6 +891,11 @@ class MLService:
         map_data = await fetch_map_from_api(map_code)
         if not map_data:
             raise ValueError(f"Map {map_code} not found")
+        
+        # Check if using cached data
+        data_source = map_data.get('_source', 'unknown')
+        cache_warning = map_data.get('_cache_warning', '')
+        collection_date = map_data.get('_collection_date', 'Unknown')
         
         # Extract features
         features = self._extract_discovery_features(map_data)
@@ -526,7 +921,7 @@ class MLService:
         # Generate recommendations
         recommendations = self._generate_discovery_recommendations(features, probability)
         
-        return {
+        result = {
             "map_code": map_code,
             "map_name": map_data['map_data'].get('name', 'Unknown'),
             "discovery_probability": round(probability, 1),
@@ -540,8 +935,17 @@ class MLService:
             },
             "strengths": strengths,
             "weaknesses": weaknesses,
-            "recommendations": recommendations
+            "recommendations": recommendations,
+            "data_source": data_source
         }
+        
+        # Add warning if using cached data
+        if data_source == 'local_cache':
+            if cache_warning:
+                result['cache_warning'] = cache_warning
+            result['collection_date'] = collection_date
+        
+        return result
     
     def _extract_discovery_features(self, map_data: Dict[str, Any]) -> Dict[str, Any]:
         """Extract features for discovery prediction"""

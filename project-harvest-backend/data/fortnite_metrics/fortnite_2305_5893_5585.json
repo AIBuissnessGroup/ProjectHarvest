@@ -1,0 +1,254 @@
+{
+  "map_code": "2305-5893-5585",
+  "fetched_at": "2025-11-25T19:29:02.268507",
+  "status": "success",
+  "metrics": {
+    "averageMinutesPerPlayer": [
+      {
+        "value": 50.5,
+        "timestamp": "2025-11-19T00:00:00.000Z"
+      },
+      {
+        "value": 22.72,
+        "timestamp": "2025-11-20T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-21T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-22T00:00:00.000Z"
+      },
+      {
+        "value": 14.41,
+        "timestamp": "2025-11-23T00:00:00.000Z"
+      },
+      {
+        "value": 31.64,
+        "timestamp": "2025-11-24T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-25T00:00:00.000Z"
+      }
+    ],
+    "peakCCU": [
+      {
+        "value": 32,
+        "timestamp": "2025-11-19T00:00:00.000Z"
+      },
+      {
+        "value": 38,
+        "timestamp": "2025-11-20T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-21T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-22T00:00:00.000Z"
+      },
+      {
+        "value": 40,
+        "timestamp": "2025-11-23T00:00:00.000Z"
+      },
+      {
+        "value": 37,
+        "timestamp": "2025-11-24T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-25T00:00:00.000Z"
+      }
+    ],
+    "favorites": [
+      {
+        "value": 10,
+        "timestamp": "2025-11-19T00:00:00.000Z"
+      },
+      {
+        "value": 5,
+        "timestamp": "2025-11-20T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-21T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-22T00:00:00.000Z"
+      },
+      {
+        "value": 3,
+        "timestamp": "2025-11-23T00:00:00.000Z"
+      },
+      {
+        "value": 5,
+        "timestamp": "2025-11-24T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-25T00:00:00.000Z"
+      }
+    ],
+    "minutesPlayed": [
+      {
+        "value": 4242,
+        "timestamp": "2025-11-19T00:00:00.000Z"
+      },
+      {
+        "value": 1068,
+        "timestamp": "2025-11-20T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-21T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-22T00:00:00.000Z"
+      },
+      {
+        "value": 879,
+        "timestamp": "2025-11-23T00:00:00.000Z"
+      },
+      {
+        "value": 1867,
+        "timestamp": "2025-11-24T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-25T00:00:00.000Z"
+      }
+    ],
+    "recommendations": [
+      {
+        "value": 2,
+        "timestamp": "2025-11-19T00:00:00.000Z"
+      },
+      {
+        "value": 0,
+        "timestamp": "2025-11-20T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-21T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-22T00:00:00.000Z"
+      },
+      {
+        "value": 0,
+        "timestamp": "2025-11-23T00:00:00.000Z"
+      },
+      {
+        "value": 0,
+        "timestamp": "2025-11-24T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-25T00:00:00.000Z"
+      }
+    ],
+    "plays": [
+      {
+        "value": 125,
+        "timestamp": "2025-11-19T00:00:00.000Z"
+      },
+      {
+        "value": 54,
+        "timestamp": "2025-11-20T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-21T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-22T00:00:00.000Z"
+      },
+      {
+        "value": 123,
+        "timestamp": "2025-11-23T00:00:00.000Z"
+      },
+      {
+        "value": 89,
+        "timestamp": "2025-11-24T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-25T00:00:00.000Z"
+      }
+    ],
+    "uniquePlayers": [
+      {
+        "value": 84,
+        "timestamp": "2025-11-19T00:00:00.000Z"
+      },
+      {
+        "value": 47,
+        "timestamp": "2025-11-20T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-21T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-22T00:00:00.000Z"
+      },
+      {
+        "value": 61,
+        "timestamp": "2025-11-23T00:00:00.000Z"
+      },
+      {
+        "value": 59,
+        "timestamp": "2025-11-24T00:00:00.000Z"
+      },
+      {
+        "value": null,
+        "timestamp": "2025-11-25T00:00:00.000Z"
+      }
+    ],
+    "retention": [
+      {
+        "d1": 0.21,
+        "d7": null,
+        "timestamp": "2025-11-19T00:00:00.000Z"
+      },
+      {
+        "d1": 0.36,
+        "d7": null,
+        "timestamp": "2025-11-20T00:00:00.000Z"
+      },
+      {
+        "d1": null,
+        "d7": null,
+        "timestamp": "2025-11-21T00:00:00.000Z"
+      },
+      {
+        "d1": null,
+        "d7": null,
+        "timestamp": "2025-11-22T00:00:00.000Z"
+      },
+      {
+        "d1": 0,
+        "d7": 0,
+        "timestamp": "2025-11-23T00:00:00.000Z"
+      },
+      {
+        "d1": null,
+        "d7": 0,
+        "timestamp": "2025-11-24T00:00:00.000Z"
+      },
+      {
+        "d1": null,
+        "d7": null,
+        "timestamp": "2025-11-25T00:00:00.000Z"
+      }
+    ]
+  }
+}

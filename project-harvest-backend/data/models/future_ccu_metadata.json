@@ -7,5 +7,42 @@
   "training_samples": 625,
   "test_samples": 157,
   "target": "future_ccu (7-day forecast)",
-  "date_trained": "2025-11-22T04:11:25.936900"
+  "date_trained": "2025-11-22T04:11:25.936900",
+  "feature_importances": {
+    "type_encoded": 0.0003583234219487653,
+    "tag_encoded": 0.005516238823847998,
+    "num_tags": 9.682500976978773e-07,
+    "max_players": 0.0069763212161715465,
+    "xp_enabled": 9.783690052319497e-06,
+    "creator_followers": 0.01683980094851163,
+    "version": 0.007241791152596045,
+    "map_age_days": 0.008546322009624964,
+    "in_discovery": 4.258932188568391e-05,
+    "baseline_ccu": 0.6640373212718738,
+    "trend_slope": 0.17914014261013894,
+    "volatility": 0.012796616759433272,
+    "recent_momentum": 0.09849378052381734
+  },
+  "feature_columns": [
+    "type_encoded",
+    "tag_encoded",
+    "num_tags",
+    "max_players",
+    "xp_enabled",
+    "creator_followers",
+    "version",
+    "map_age_days",
+    "in_discovery",
+    "baseline_ccu",
+    "trend_slope",
+    "volatility",
+    "recent_momentum"
+  ],
+  "top_features": [
+    "baseline_ccu",
+    "trend_slope",
+    "recent_momentum",
+    "creator_followers",
+    "volatility"
+  ]
 }
