@@ -64,10 +64,11 @@ export function HistoricalCCUChart({
     );
   };
 
-  // Use anomaly flags from data (set by backend) or match by anomaly list
-  const chartData = data.map((point: any) => ({
+  // Use anomaly flags from data (set by backend) or match by EXACT index only
+  // Don't match by CCU value as multiple points can have the same CCU
+  const chartData = data.map((point: any, idx: number) => ({
     ...point,
-    isAnomaly: point.isAnomaly || anomalies.some(a => a.index === point.index || a.ccu === point.ccu)
+    isAnomaly: point.isAnomaly || anomalies.some(a => a.index === idx || a.index === point.index)
   }));
 
   // Use backend count if provided, otherwise count from data

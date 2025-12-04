@@ -25,6 +25,9 @@ from app.services.fncreate_service import fetch_map_from_api
 class MLService:
     """Unified ML service for all prediction models"""
     
+    # Path to historical data
+    HISTORICAL_DIR = Path("data/historical")
+    
     def __init__(self):
         self.models_dir = Path("data/models")
         
@@ -600,6 +603,9 @@ class MLService:
         
         Only flags as anomaly if 2+ methods agree.
         
+        ENHANCED: Uses historical data (if available) for better pattern detection.
+        With 30+ days of data, can identify weekly patterns and true anomalies.
+        
         Args:
             map_code: Map code
             
@@ -616,7 +622,7 @@ class MLService:
         cache_warning = map_data.get('_cache_warning', '')
         collection_date = map_data.get('_collection_date', 'Unknown')
         
-        # Extract time-series
+        # Extract time-series from current data
         stats_7d = map_data.get('stats_7d', {})
         if not stats_7d.get('success'):
             raise ValueError("No time-series data available")
@@ -625,7 +631,20 @@ class MLService:
         if len(ccu_series) < 50:
             raise ValueError("Insufficient data for anomaly detection")
         
-        # Get date range for timestamp calculation
+        # Try to load historical data for better context
+        historical_ccu, historical_days = self._load_historical_ccu(map_code)
+        using_historical = False
+        
+        if historical_ccu and len(historical_ccu) > len(ccu_series) * 2:
+            # Use historical data if we have significantly more (2x)
+            # This gives us weekly/monthly pattern context
+            ccu_series_for_detection = historical_ccu
+            using_historical = True
+            print(f"📊 Using {historical_days} days of historical data for anomaly detection")
+        else:
+            ccu_series_for_detection = ccu_series
+        
+        # Get date range for timestamp calculation (from current 7-day data)
         try:
             date_from_str = stats_7d.get('data', {}).get('from', '')
             date_to_str = stats_7d.get('data', {}).get('to', '')
@@ -639,7 +658,12 @@ class MLService:
             total_duration = 0
         
         # Run HYBRID anomaly detection
-        hybrid_result = self._detect_anomalies_hybrid(ccu_series)
+        # If using historical, we pass the full series but focus on recent anomalies
+        hybrid_result = self._detect_anomalies_hybrid(
+            ccu_series_for_detection,
+            focus_recent=using_historical,
+            recent_count=len(ccu_series)  # Only report anomalies in recent data
+        )
         
         spike_indices = hybrid_result['spike_indices']
         spike_details_raw = hybrid_result['spike_details']
@@ -676,14 +700,26 @@ class MLService:
             
             spike_details.append(spike_detail)
         
+        # Get map scale info
+        map_scale = hybrid_result.get('map_scale', {})
+        is_small_map = map_scale.get('is_small_map', False)
+        max_ccu = map_scale.get('max_ccu', 0)
+        min_threshold = map_scale.get('min_spike_threshold', 0)
+        
         # Interpretation
         if num_spikes > 0:
             methods_used = set()
             for s in spike_details_raw:
                 methods_used.update(s['methods_agreed'])
             interpretation = f"Map shows {num_spikes} unusual CCU spike(s) detected by hybrid analysis ({', '.join(methods_used)}). Possible campaign activity or viral moment."
+        elif is_small_map and max_ccu < 50:
+            interpretation = f"This is a small map (peak CCU: {max_ccu}). No significant anomalies were detected because the CCU variations are too small to distinguish from normal fluctuations. For meaningful anomaly detection, spikes need to exceed {int(min_threshold)} CCU above the average."
         else:
             interpretation = "Map shows normal CCU behavior. No significant anomalies detected by hybrid analysis."
+        
+        # Add historical context to interpretation
+        if using_historical:
+            interpretation = f"[Using {historical_days} days of historical data for pattern context] " + interpretation
         
         result = {
             "map_code": map_code,
@@ -695,7 +731,10 @@ class MLService:
             "interpretation": interpretation,
             "detection_method": "hybrid",
             "methods_used": ["STL", "peak_prominence", "LOF"],
-            "data_source": data_source
+            "data_source": data_source,
+            "map_scale": map_scale,  # Include scale info for context
+            "using_historical_data": using_historical,
+            "historical_days": historical_days if using_historical else 0
         }
         
         # Add warning if using cached data
@@ -706,7 +745,59 @@ class MLService:
         
         return result
     
-    def _detect_anomalies_hybrid(self, ccu_series: List[float], min_votes: int = 2, grouping_window: int = 6) -> Dict[str, Any]:
+    def _load_historical_ccu(self, map_code: str, max_days: int = 60) -> Tuple[List[float], int]:
+        """
+        Load historical CCU data for a map if available.
+        
+        Args:
+            map_code: Map code
+            max_days: Maximum days of history to load
+            
+        Returns:
+            Tuple of (combined_ccu_series, num_days)
+        """
+        import json
+        
+        # Try different directory name formats
+        map_dir_options = [
+            self.HISTORICAL_DIR / map_code.replace("-", ""),
+            self.HISTORICAL_DIR / map_code,
+        ]
+        
+        map_dir = None
+        for option in map_dir_options:
+            if option.exists():
+                map_dir = option
+                break
+        
+        if not map_dir:
+            return [], 0
+        
+        # Load all snapshots sorted by date
+        snapshots = []
+        for file in sorted(map_dir.glob("*.json")):
+            try:
+                with open(file) as f:
+                    data = json.load(f)
+                    snapshots.append(data)
+            except:
+                continue
+        
+        if not snapshots:
+            return [], 0
+        
+        # Limit to max_days
+        snapshots = snapshots[-max_days:]
+        
+        # Combine all CCU readings
+        combined_ccu = []
+        for snapshot in snapshots:
+            readings = snapshot.get('ccu_readings', [])
+            combined_ccu.extend(readings)
+        
+        return combined_ccu, len(snapshots)
+    
+    def _detect_anomalies_hybrid(self, ccu_series: List[float], min_votes: int = 2, grouping_window: int = 6, focus_recent: bool = False, recent_count: int = 0) -> Dict[str, Any]:
         """
         Hybrid anomaly detection using ensemble of 3 methods.
         Only flags as anomaly if min_votes methods agree.
@@ -715,9 +806,31 @@ class MLService:
         1. STL Decomposition + IQR on residuals
         2. Peak Prominence (scipy find_peaks)
         3. Local Outlier Factor (LOF)
+        
+        SCALE-AWARE: Adjusts thresholds based on map's CCU scale.
         """
         arr = np.array(ccu_series, dtype=float)
         n_points = len(arr)
+        
+        # Calculate map scale metrics for scale-aware detection
+        mean_ccu = np.mean(arr)
+        max_ccu = np.max(arr)
+        std_ccu = np.std(arr)
+        
+        # Determine if this is a "small map" (low CCU)
+        is_small_map = max_ccu < 50
+        is_tiny_map = max_ccu < 20
+        
+        # Minimum absolute spike magnitude to consider (scale-aware)
+        if is_tiny_map:
+            # For tiny maps (peak < 20), need at least 10 CCU spike above mean
+            min_spike_magnitude = max(10, mean_ccu * 2)
+        elif is_small_map:
+            # For small maps (peak < 50), need at least 15 CCU spike above mean
+            min_spike_magnitude = max(15, mean_ccu * 1.5)
+        else:
+            # For larger maps, need meaningful relative spike (25% above mean or 20 CCU)
+            min_spike_magnitude = max(20, mean_ccu * 0.25)
         
         # Initialize vote counter for each point
         votes = np.zeros(n_points, dtype=int)
@@ -779,13 +892,32 @@ class MLService:
         spike_details = []
         spike_indices = []
         
+        # If using historical data, only report anomalies in recent portion
+        recent_start_idx = n_points - recent_count if (focus_recent and recent_count > 0) else 0
+        
         for spike_group in spike_events:
             peak_idx = max(spike_group, key=lambda i: arr[i])
-            spike_indices.append(peak_idx)
+            peak_ccu = arr[peak_idx]
+            
+            # FOCUS_RECENT FILTERING: Skip spikes not in recent data when using historical
+            if focus_recent and recent_count > 0 and peak_idx < recent_start_idx:
+                continue  # This anomaly is in old historical data, skip it
+            
+            # SCALE-AWARE FILTERING: Skip spikes that don't meet minimum magnitude
+            spike_magnitude = peak_ccu - mean_ccu
+            if spike_magnitude < min_spike_magnitude:
+                continue  # Not significant enough for this map's scale
+            
+            # Adjust index to be relative to recent data (for chart display)
+            display_idx = peak_idx - recent_start_idx if focus_recent else peak_idx
+            
+            spike_indices.append(display_idx)
             
             spike_details.append({
-                'peak_index': peak_idx,
-                'peak_ccu': int(arr[peak_idx]),
+                'peak_index': display_idx,
+                'original_index': peak_idx,
+                'peak_ccu': int(peak_ccu),
+                'spike_magnitude': round(float(spike_magnitude), 1),
                 'votes': int(votes[peak_idx]),
                 'spike_duration_indices': len(spike_group),
                 'methods_agreed': [
@@ -799,7 +931,18 @@ class MLService:
             'spike_details': spike_details,
             'num_spikes': len(spike_indices),
             'method_results': method_results,
-            'votes': votes
+            'votes': votes,
+            'map_scale': {
+                'mean_ccu': round(float(mean_ccu), 1),
+                'max_ccu': int(max_ccu),
+                'min_spike_threshold': round(float(min_spike_magnitude), 1),
+                'is_small_map': is_small_map
+            },
+            'historical_context': {
+                'using_historical': focus_recent,
+                'total_data_points': n_points,
+                'recent_data_points': recent_count if focus_recent else n_points
+            }
         }
     
     def _detect_anomalies_stl(self, ccu_series: List[float], period: int = 48) -> List[int]:

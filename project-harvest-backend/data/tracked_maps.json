@@ -1,0 +1,23 @@
+{
+  "description": "Maps to track for historical CCU data collection",
+  "last_updated": "2025-12-04",
+  "maps": [
+    "8530-0110-2817",
+    "0038-9297-7629"
+  ],
+  "notes": {
+    "8530-0110-2817": "PEELY VS JONESY - Test map",
+    "0038-9297-7629": "MANSION ESCAPE - LEGO activation"
+  },
+  "lego_campaign_maps": {
+    "description": "Maps from CPT's LEGO activation - to be added when map codes are obtained",
+    "maps_to_find": [
+      "Mansion Escape",
+      "Escape the Forest", 
+      "BrickRooms",
+      "Brick Island",
+      "Treasure Extraction"
+    ]
+  }
+}
+
