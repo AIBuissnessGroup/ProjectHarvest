@@ -239,13 +239,37 @@ def extract_features_from_historical(map_dir: Path) -> Optional[Dict]:
     
     latest = snapshots[-1]
     
+    # Extract map metadata (from new collection format)
+    map_metadata = latest.get('map_metadata', {})
+    creator_info = latest.get('creator', {})
+    trend_features = latest.get('trend_features', {})
+    
     features = {
         'map_code': latest.get('map_code', map_dir.name),
         'baseline_ccu': np.mean(training_data),
         'future_ccu_7d': np.mean(future_data),
         'volatility': np.std(training_data),
         'historical_days': len(snapshots),
+        
+        # Map metadata (if available from new collection format)
+        'creator_followers': map_metadata.get('creator_followers', creator_info.get('followers', 0)),
+        'in_discovery': map_metadata.get('in_discovery', 0),
+        'xp_enabled': map_metadata.get('xp_enabled', 0),
+        'num_tags': map_metadata.get('num_tags', 0),
+        'max_players': map_metadata.get('max_players', 0),
+        'version': map_metadata.get('version', 1),
     }
+    
+    # Calculate map age if created_at is available
+    created_at = map_metadata.get('created_at', '')
+    if created_at:
+        try:
+            created_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            features['map_age_days'] = (datetime.now() - created_date).days
+        except:
+            features['map_age_days'] = 0
+    else:
+        features['map_age_days'] = 0
     
     # Trend slope from full history
     if len(training_data) > 1:

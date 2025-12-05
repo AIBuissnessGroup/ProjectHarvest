@@ -239,6 +239,20 @@ When providing recommendations:
                     },
                     "required": ["map_code"]
                 }
+            },
+            {
+                "name": "analyze_peak_times",
+                "description": "Analyze when a map has the most players (peak times). Use when user asks about 'peak times', 'most popular times', 'best times to play', 'when are players online', 'busiest hours', or time-based analysis.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "map_code": {
+                            "type": "string",
+                            "description": "The map code to analyze peak times for"
+                        }
+                    },
+                    "required": ["map_code"]
+                }
             }
         ]
     
@@ -368,6 +382,9 @@ When providing recommendations:
             
             elif function_name == "get_historical_ccu":
                 return await self._get_historical_ccu(arguments["map_code"])
+            
+            elif function_name == "analyze_peak_times":
+                return await self._analyze_peak_times(arguments["map_code"])
             
             else:
                 return {"error": f"Unknown function: {function_name}"}
@@ -738,6 +755,170 @@ When providing recommendations:
             "cache_warning": cache_warning,
             "collection_date": collection_date,
             "chart_type": "historical_ccu"
+        }
+    
+    async def _analyze_peak_times(self, map_code: str) -> Dict[str, Any]:
+        """
+        Analyze peak times for a map - when are players most active?
+        Identifies popular hours, days of week, and patterns.
+        """
+        
+        logger.info(f"⏰ Analyzing peak times for map {map_code}")
+        
+        # Fetch map data
+        map_data = await fetch_map_from_api(map_code)
+        if not map_data:
+            return {
+                "error": f"Could not fetch map {map_code}. It may not exist or the API is unavailable."
+            }
+        
+        # Get the raw stats
+        stats_7d = map_data.get('stats_7d', {})
+        map_info = map_data.get('map_data', {})
+        map_name = map_info.get('name', 'Unknown Map')
+        
+        # Extract CCU data with timestamps
+        from datetime import datetime, timedelta
+        from collections import defaultdict
+        import numpy as np
+        
+        hourly_data = defaultdict(list)  # hour -> list of CCU values
+        daily_data = defaultdict(list)   # day_name -> list of CCU values
+        time_series = []
+        
+        # Check if stats_7d has 'data' -> 'stats' structure
+        if isinstance(stats_7d, dict):
+            stats_list = stats_7d.get('data', {}).get('stats', [])
+            
+            # Get actual date range from API
+            try:
+                date_from_str = stats_7d.get('data', {}).get('from', '')
+                date_to_str = stats_7d.get('data', {}).get('to', '')
+                date_from = datetime.fromisoformat(date_from_str.replace('Z', '+00:00'))
+                date_to = datetime.fromisoformat(date_to_str.replace('Z', '+00:00'))
+                total_duration = (date_to - date_from).total_seconds()
+                has_api_dates = True
+            except Exception as e:
+                logger.warning(f"⚠️ Could not parse API dates: {e}")
+                has_api_dates = False
+                date_from = datetime.now() - timedelta(days=7)
+                total_duration = 7 * 24 * 60 * 60  # 7 days in seconds
+            
+            if isinstance(stats_list, list) and len(stats_list) > 0:
+                for i, ccu in enumerate(stats_list):
+                    if isinstance(ccu, (int, float)):
+                        # Calculate timestamp
+                        if has_api_dates and len(stats_list) > 1:
+                            progress = i / (len(stats_list) - 1)
+                            seconds_offset = total_duration * progress
+                            timestamp = date_from + timedelta(seconds=seconds_offset)
+                        else:
+                            timestamp = date_from + timedelta(minutes=30 * i)
+                        
+                        hour = timestamp.hour
+                        day_name = timestamp.strftime('%A')  # Monday, Tuesday, etc.
+                        
+                        hourly_data[hour].append(int(ccu))
+                        daily_data[day_name].append(int(ccu))
+                        time_series.append({
+                            'timestamp': timestamp,
+                            'ccu': int(ccu),
+                            'hour': hour,
+                            'day': day_name
+                        })
+        
+        if not time_series:
+            return {
+                "error": "No time series data available for this map."
+            }
+        
+        # Calculate hourly averages and find peak hours
+        hourly_avg = {}
+        for hour, values in hourly_data.items():
+            hourly_avg[hour] = round(np.mean(values), 1)
+        
+        # Sort by average CCU to find peak hours
+        sorted_hours = sorted(hourly_avg.items(), key=lambda x: x[1], reverse=True)
+        peak_hours = sorted_hours[:3]  # Top 3 peak hours
+        low_hours = sorted_hours[-3:]  # Bottom 3 hours
+        
+        # Calculate daily averages
+        daily_avg = {}
+        day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        for day, values in daily_data.items():
+            daily_avg[day] = round(np.mean(values), 1)
+        
+        # Sort days by average CCU
+        sorted_days = sorted(daily_avg.items(), key=lambda x: x[1], reverse=True)
+        
+        # Calculate overall stats
+        all_ccu = [t['ccu'] for t in time_series]
+        overall_avg = float(round(np.mean(all_ccu), 1))
+        overall_max = int(max(all_ccu))
+        overall_min = int(min(all_ccu))
+        
+        # Format peak hours for display
+        def format_hour(h):
+            if h == 0:
+                return "12 AM (Midnight)"
+            elif h < 12:
+                return f"{h} AM"
+            elif h == 12:
+                return "12 PM (Noon)"
+            else:
+                return f"{h-12} PM"
+        
+        # Convert numpy types to native Python types
+        peak_hours_formatted = [
+            {"hour": format_hour(int(h)), "avg_ccu": float(avg), "raw_hour": int(h)}
+            for h, avg in peak_hours
+        ]
+        
+        low_hours_formatted = [
+            {"hour": format_hour(int(h)), "avg_ccu": float(avg), "raw_hour": int(h)}
+            for h, avg in low_hours
+        ]
+        
+        # Data source info
+        data_source = map_data.get('_source', 'live_api')
+        cache_warning = map_data.get('_cache_warning', None)
+        collection_date = map_data.get('_collection_date', None)
+        
+        # Convert daily and hourly breakdowns to native Python types
+        daily_breakdown = {day: float(daily_avg.get(day, 0)) for day in day_order if day in daily_avg}
+        hourly_breakdown = {format_hour(int(h)): float(avg) for h, avg in sorted(hourly_avg.items())}
+        
+        # Convert best/worst day tuples
+        best_day = (sorted_days[0][0], float(sorted_days[0][1])) if sorted_days else None
+        worst_day = (sorted_days[-1][0], float(sorted_days[-1][1])) if sorted_days else None
+        
+        return {
+            "success": True,
+            "map_code": map_code,
+            "map_name": map_name,
+            "analysis": {
+                "peak_hours": peak_hours_formatted,
+                "low_activity_hours": low_hours_formatted,
+                "best_day": best_day,
+                "worst_day": worst_day,
+                "daily_breakdown": daily_breakdown,
+                "hourly_breakdown": hourly_breakdown
+            },
+            "stats": {
+                "overall_average": overall_avg,
+                "peak_ccu": overall_max,
+                "lowest_ccu": overall_min,
+                "data_points": len(time_series),
+                "time_span_days": float(round(total_duration / (24 * 60 * 60), 1))
+            },
+            "insights": {
+                "best_campaign_time": f"{peak_hours_formatted[0]['hour']} on {sorted_days[0][0]}" if peak_hours_formatted and sorted_days else "Unknown",
+                "avoid_time": f"{low_hours_formatted[0]['hour']}" if low_hours_formatted else "Unknown",
+                "pattern_detected": bool(len(peak_hours) > 0 and (peak_hours[0][1] > overall_avg * 1.5))
+            },
+            "data_source": data_source,
+            "cache_warning": cache_warning,
+            "collection_date": collection_date
         }
     
     async def get_quick_insights(self, map_code: str) -> str:

@@ -707,11 +707,18 @@ class MLService:
         min_threshold = map_scale.get('min_spike_threshold', 0)
         
         # Interpretation
+        # Check if map has recurring pattern (from hybrid_result)
+        has_pattern = map_scale.get('has_recurring_pattern', False)
+        typical_peak = map_scale.get('typical_peak_ccu', 0)
+        pattern_threshold_val = map_scale.get('pattern_threshold', 0)
+        
         if num_spikes > 0:
             methods_used = set()
             for s in spike_details_raw:
                 methods_used.update(s['methods_agreed'])
             interpretation = f"Map shows {num_spikes} unusual CCU spike(s) detected by hybrid analysis ({', '.join(methods_used)}). Possible campaign activity or viral moment."
+        elif has_pattern and num_spikes == 0:
+            interpretation = f"This map has a recurring daily/weekly pattern with typical peaks around {int(typical_peak)} CCU. No anomalies were detected because all spikes fall within the normal pattern. A true anomaly would need to exceed {int(pattern_threshold_val)} CCU to be considered unusual."
         elif is_small_map and max_ccu < 50:
             interpretation = f"This is a small map (peak CCU: {max_ccu}). No significant anomalies were detected because the CCU variations are too small to distinguish from normal fluctuations. For meaningful anomaly detection, spikes need to exceed {int(min_threshold)} CCU above the average."
         else:
@@ -808,6 +815,7 @@ class MLService:
         3. Local Outlier Factor (LOF)
         
         SCALE-AWARE: Adjusts thresholds based on map's CCU scale.
+        PATTERN-AWARE: Detects recurring patterns and only flags true outliers.
         """
         arr = np.array(ccu_series, dtype=float)
         n_points = len(arr)
@@ -816,6 +824,28 @@ class MLService:
         mean_ccu = np.mean(arr)
         max_ccu = np.max(arr)
         std_ccu = np.std(arr)
+        
+        # PATTERN DETECTION: Find recurring peaks to establish "normal" peak behavior
+        # This helps avoid flagging regular daily/weekly spikes as anomalies
+        from scipy.signal import find_peaks as scipy_find_peaks
+        all_peaks, peak_props = scipy_find_peaks(arr, distance=12, prominence=std_ccu * 0.5)
+        
+        if len(all_peaks) >= 3:
+            # Get the CCU values at all peaks
+            peak_values = arr[all_peaks]
+            # Calculate the "typical" peak height (median of peaks)
+            typical_peak = np.median(peak_values)
+            # Calculate variation in peak heights
+            peak_std = np.std(peak_values)
+            # A true anomaly should be significantly above the typical peak
+            # Use 2 standard deviations above typical peak as threshold
+            pattern_threshold = typical_peak + (2 * peak_std)
+            has_pattern = True
+        else:
+            typical_peak = max_ccu
+            pattern_threshold = max_ccu
+            peak_std = 0
+            has_pattern = False
         
         # Determine if this is a "small map" (low CCU)
         is_small_map = max_ccu < 50
@@ -828,8 +858,12 @@ class MLService:
         elif is_small_map:
             # For small maps (peak < 50), need at least 15 CCU spike above mean
             min_spike_magnitude = max(15, mean_ccu * 1.5)
+        elif has_pattern:
+            # For maps with recurring patterns, anomaly must exceed pattern threshold
+            # This is the key fix: compare to typical peaks, not just mean
+            min_spike_magnitude = pattern_threshold - mean_ccu
         else:
-            # For larger maps, need meaningful relative spike (25% above mean or 20 CCU)
+            # For larger maps without clear pattern, use standard threshold
             min_spike_magnitude = max(20, mean_ccu * 0.25)
         
         # Initialize vote counter for each point
@@ -873,7 +907,21 @@ class MLService:
                 'spike_details': [],
                 'num_spikes': 0,
                 'method_results': method_results,
-                'votes': votes
+                'votes': votes.tolist(),
+                'map_scale': {
+                    'mean_ccu': round(float(mean_ccu), 1),
+                    'max_ccu': int(max_ccu),
+                    'min_spike_threshold': round(float(min_spike_magnitude), 1),
+                    'is_small_map': bool(is_small_map),
+                    'has_recurring_pattern': bool(has_pattern),
+                    'typical_peak_ccu': round(float(typical_peak), 1) if has_pattern else None,
+                    'pattern_threshold': round(float(pattern_threshold), 1) if has_pattern else None
+                },
+                'historical_context': {
+                    'using_historical': bool(focus_recent),
+                    'total_data_points': int(n_points),
+                    'recent_data_points': int(recent_count) if focus_recent else int(n_points)
+                }
             }
         
         # Group consecutive/nearby indices into spike events
@@ -931,17 +979,17 @@ class MLService:
             'spike_details': spike_details,
             'num_spikes': len(spike_indices),
             'method_results': method_results,
-            'votes': votes,
+            'votes': votes.tolist(),  # Convert numpy array to list
             'map_scale': {
                 'mean_ccu': round(float(mean_ccu), 1),
                 'max_ccu': int(max_ccu),
                 'min_spike_threshold': round(float(min_spike_magnitude), 1),
-                'is_small_map': is_small_map
+                'is_small_map': bool(is_small_map)  # Convert numpy bool to Python bool
             },
             'historical_context': {
-                'using_historical': focus_recent,
-                'total_data_points': n_points,
-                'recent_data_points': recent_count if focus_recent else n_points
+                'using_historical': bool(focus_recent),  # Ensure Python bool
+                'total_data_points': int(n_points),
+                'recent_data_points': int(recent_count) if focus_recent else int(n_points)
             }
         }
     

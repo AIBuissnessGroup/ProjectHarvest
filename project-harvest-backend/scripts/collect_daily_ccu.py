@@ -97,23 +97,73 @@ def save_daily_snapshot(map_code: str, map_data: Dict, date: str) -> bool:
     import numpy as np
     arr = np.array(ccu_readings)
     
+    # Extract map metadata for model training
+    map_info = map_data.get('map_data', {})
+    creator_info = map_info.get('creator', {})
+    
+    # Calculate trend features from CCU data
+    trend_slope = 0
+    recent_momentum = 0
+    if len(ccu_readings) > 10:
+        x = np.arange(len(ccu_readings))
+        trend_slope, _ = np.polyfit(x, ccu_readings, 1)
+        
+        # Recent momentum (last 20% vs first 20%)
+        recent_idx = int(len(ccu_readings) * 0.8)
+        early_idx = int(len(ccu_readings) * 0.2)
+        recent_avg = np.mean(ccu_readings[recent_idx:])
+        early_avg = np.mean(ccu_readings[:early_idx]) if early_idx > 0 else np.mean(ccu_readings)
+        recent_momentum = float(recent_avg - early_avg)
+    
     snapshot = {
         "map_code": map_code,
-        "map_name": map_data.get('map_data', {}).get('name', 'Unknown'),
+        "map_name": map_info.get('name', 'Unknown'),
         "collection_date": date,
         "collection_timestamp": datetime.now().isoformat(),
+        
+        # CCU Time Series Data
         "data_range": {
             "from": date_from,
             "to": date_to
         },
         "ccu_readings": ccu_readings,
         "num_readings": len(ccu_readings),
+        
+        # CCU Summary Stats
         "summary": {
             "avg_ccu": round(float(np.mean(arr)), 2),
             "max_ccu": int(np.max(arr)),
             "min_ccu": int(np.min(arr)),
             "std_ccu": round(float(np.std(arr)), 2),
             "median_ccu": round(float(np.median(arr)), 2)
+        },
+        
+        # Trend Features (for Future CCU model)
+        "trend_features": {
+            "trend_slope": round(float(trend_slope), 4),
+            "recent_momentum": round(float(recent_momentum), 2),
+            "volatility": round(float(np.std(arr)), 2)
+        },
+        
+        # Map Metadata (for all models)
+        "map_metadata": {
+            "creator_followers": creator_info.get('followers', 0),
+            "in_discovery": 1 if map_info.get('discovery', False) else 0,
+            "xp_enabled": 1 if map_info.get('xpEnabled', False) else 0,
+            "num_tags": len(map_info.get('tags', [])),
+            "tags": map_info.get('tags', []),
+            "max_players": map_info.get('maxPlayers', 0),
+            "version": map_info.get('version', 1),
+            "created_at": map_info.get('createdAt', ''),
+            "type": map_info.get('type', 'unknown'),
+            "image_url": map_info.get('image', '')
+        },
+        
+        # Creator Info
+        "creator": {
+            "name": creator_info.get('name', 'Unknown'),
+            "code": creator_info.get('code', ''),
+            "followers": creator_info.get('followers', 0)
         }
     }
     
