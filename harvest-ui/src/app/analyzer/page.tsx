@@ -677,7 +677,11 @@ export default function ProjectHarvest() {
                           </ReactMarkdown>
                         </div>
 
-                        {message.content.includes("created") && (
+                        {(message.content.includes("chart has been created") || 
+                          message.content.includes("visualization has been created") ||
+                          message.content.includes("I've created a") ||
+                          message.content.includes("Here's the chart") ||
+                          message.content.includes("displaying the chart")) && (
                           <div className="bg-brand-500/10 border border-brand-500/30 rounded-lg p-3 mt-3">
                             <p className="text-xs text-brand-300 font-medium">✓ Visualization added to canvas</p>
                           </div>

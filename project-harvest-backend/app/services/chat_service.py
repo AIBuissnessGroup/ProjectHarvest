@@ -253,6 +253,42 @@ When providing recommendations:
                     },
                     "required": ["map_code"]
                 }
+            },
+            {
+                "name": "check_map_updates",
+                "description": "Check if a map was recently updated by comparing version numbers. Use when user asks about 'updates', 'recently updated', 'new version', 'was this map updated', 'version changes', or 'when was this updated'.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "map_code": {
+                            "type": "string",
+                            "description": "The map code to check for updates"
+                        }
+                    },
+                    "required": ["map_code"]
+                }
+            },
+            {
+                "name": "get_map_metric",
+                "description": "Get any specific metric or data point for a map from the live API, with optional historical comparison. Use this for specific questions like 'what is the retention rate?', 'how many favorites?', 'what's the current CCU?', 'how many followers does the creator have?', 'is XP enabled?', 'how has CCU changed?', 'did favorites increase?'. Available metrics: ccu, avg_ccu, max_ccu, min_ccu, retention, favorites, followers, version, xp_enabled, in_discovery, max_players, tags, type, created_date, published_date, minutes_played, ccu_record.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "map_code": {
+                            "type": "string",
+                            "description": "The map code to get data for"
+                        },
+                        "metric": {
+                            "type": "string",
+                            "description": "The metric to retrieve. Options: ccu, avg_ccu, max_ccu, min_ccu, retention, favorites, followers, version, xp_enabled, in_discovery, max_players, tags, type, created_date, published_date, minutes_played, ccu_record, all (returns all metrics)"
+                        },
+                        "compare_historically": {
+                            "type": "boolean",
+                            "description": "If true, compare current value with historical data to show changes. Default false."
+                        }
+                    },
+                    "required": ["map_code", "metric"]
+                }
             }
         ]
     
@@ -385,6 +421,16 @@ When providing recommendations:
             
             elif function_name == "analyze_peak_times":
                 return await self._analyze_peak_times(arguments["map_code"])
+            
+            elif function_name == "check_map_updates":
+                return await self._check_map_updates(arguments["map_code"])
+            
+            elif function_name == "get_map_metric":
+                return await self._get_map_metric(
+                    arguments["map_code"],
+                    arguments["metric"],
+                    arguments.get("compare_historically", False)
+                )
             
             else:
                 return {"error": f"Unknown function: {function_name}"}
@@ -919,6 +965,359 @@ When providing recommendations:
             "data_source": data_source,
             "cache_warning": cache_warning,
             "collection_date": collection_date
+        }
+    
+    async def _get_map_metric(self, map_code: str, metric: str, compare_historically: bool = False) -> Dict[str, Any]:
+        """
+        Get any specific metric for a map from the live API.
+        Optionally compares with historical data to show changes.
+        """
+        
+        logger.info(f"📊 Getting metric '{metric}' for map {map_code} (historical={compare_historically})")
+        
+        from pathlib import Path
+        from datetime import datetime
+        import json
+        import numpy as np
+        
+        # Fetch current map data from API
+        map_data = await fetch_map_from_api(map_code)
+        if not map_data:
+            return {
+                "error": f"Could not fetch map {map_code}. It may not exist or the API is unavailable."
+            }
+        
+        map_info = map_data.get('map_data', {})
+        stats_7d = map_data.get('stats_7d', {})
+        map_name = map_info.get('name', 'Unknown Map')
+        creator_info = map_info.get('creator', {})
+        
+        # Extract CCU stats
+        ccu_readings = stats_7d.get('data', {}).get('stats', []) if isinstance(stats_7d, dict) else []
+        
+        # Define metric extraction mapping
+        def get_metric_value(metric_name: str) -> tuple:
+            """Returns (value, display_name, unit)"""
+            metric_lower = metric_name.lower().strip()
+            
+            # CCU metrics
+            if metric_lower in ['ccu', 'current_ccu', 'live_ccu']:
+                return (int(ccu_readings[-1]) if ccu_readings else 0, "Current CCU", "players")
+            elif metric_lower in ['avg_ccu', 'average_ccu']:
+                return (round(float(np.mean(ccu_readings)), 1) if ccu_readings else 0, "Average CCU (7 days)", "players")
+            elif metric_lower in ['max_ccu', 'peak_ccu']:
+                return (int(max(ccu_readings)) if ccu_readings else 0, "Peak CCU (7 days)", "players")
+            elif metric_lower in ['min_ccu', 'lowest_ccu']:
+                return (int(min(ccu_readings)) if ccu_readings else 0, "Lowest CCU (7 days)", "players")
+            elif metric_lower in ['ccu_record', 'all_time_peak']:
+                return (int(map_info.get('ccu_record', 0)), "All-Time CCU Record", "players")
+            
+            # Engagement metrics
+            elif metric_lower in ['retention', 'retention_rate']:
+                # Calculate from CCU data if available
+                if len(ccu_readings) > 48:  # At least 2 days
+                    day1_avg = np.mean(ccu_readings[:48])
+                    day7_avg = np.mean(ccu_readings[-48:])
+                    retention = round((day7_avg / day1_avg) * 100, 1) if day1_avg > 0 else 0
+                    return (retention, "7-Day Retention Rate", "%")
+                return (None, "Retention Rate", "% (insufficient data)")
+            elif metric_lower in ['favorites', 'favourites']:
+                return (int(map_info.get('favorites', map_info.get('favourites', 0))), "Favorites", "favorites")
+            elif metric_lower in ['minutes_played', 'total_minutes', 'playtime']:
+                mins = map_info.get('minutes_played', 0)
+                hours = round(mins / 60, 1) if mins else 0
+                return (hours, "Total Playtime", "hours")
+            
+            # Creator metrics
+            elif metric_lower in ['followers', 'creator_followers']:
+                return (int(creator_info.get('followers', creator_info.get('lookup_follower_count', 0))), "Creator Followers", "followers")
+            
+            # Map metadata
+            elif metric_lower == 'version':
+                return (int(map_info.get('version', 0)), "Map Version", "")
+            elif metric_lower in ['xp_enabled', 'xp']:
+                return (bool(map_info.get('xpEnabled', map_info.get('xp_enabled', False))), "XP Enabled", "")
+            elif metric_lower in ['in_discovery', 'discovery']:
+                state = map_info.get('state', '')
+                in_disc = 'discovery' in state.lower() if state else map_info.get('discovery', False)
+                return (bool(in_disc), "In Discovery", "")
+            elif metric_lower in ['max_players', 'player_limit']:
+                return (int(map_info.get('max_players', map_info.get('maxPlayers', 0))), "Max Players", "players")
+            elif metric_lower == 'tags':
+                return (map_info.get('tags', []), "Tags", "")
+            elif metric_lower == 'type':
+                return (map_info.get('type', 'unknown'), "Map Type", "")
+            elif metric_lower in ['created_date', 'created', 'creation_date']:
+                return (map_info.get('createdAt', map_info.get('created', '')), "Created Date", "")
+            elif metric_lower in ['published_date', 'published']:
+                return (map_info.get('published', ''), "Published Date", "")
+            
+            # All metrics
+            elif metric_lower == 'all':
+                return ('all', "All Metrics", "")
+            
+            else:
+                return (None, metric_name, "(unknown metric)")
+        
+        # Get the requested metric
+        if metric.lower() == 'all':
+            # Return all available metrics
+            all_metrics = {}
+            for m in ['ccu', 'avg_ccu', 'max_ccu', 'min_ccu', 'ccu_record', 'favorites', 
+                      'followers', 'version', 'xp_enabled', 'in_discovery', 'max_players', 
+                      'tags', 'type', 'minutes_played']:
+                val, name, unit = get_metric_value(m)
+                all_metrics[m] = {
+                    "value": val if not isinstance(val, (np.integer, np.floating, np.bool_)) else (int(val) if isinstance(val, np.integer) else float(val) if isinstance(val, np.floating) else bool(val)),
+                    "display_name": name,
+                    "unit": unit
+                }
+            
+            return {
+                "success": True,
+                "map_code": map_code,
+                "map_name": map_name,
+                "metrics": all_metrics,
+                "data_source": map_data.get('_source', 'live_api')
+            }
+        
+        value, display_name, unit = get_metric_value(metric)
+        
+        if value is None and "(unknown metric)" in unit:
+            return {
+                "error": f"Unknown metric '{metric}'. Available metrics: ccu, avg_ccu, max_ccu, min_ccu, retention, favorites, followers, version, xp_enabled, in_discovery, max_players, tags, type, created_date, published_date, minutes_played, ccu_record, all"
+            }
+        
+        # Convert numpy types to native Python
+        if isinstance(value, (np.integer, np.int64)):
+            value = int(value)
+        elif isinstance(value, (np.floating, np.float64)):
+            value = float(value)
+        elif isinstance(value, np.bool_):
+            value = bool(value)
+        
+        result = {
+            "success": True,
+            "map_code": map_code,
+            "map_name": map_name,
+            "metric": metric,
+            "display_name": display_name,
+            "current_value": value,
+            "unit": unit,
+            "data_source": map_data.get('_source', 'live_api')
+        }
+        
+        # Historical comparison if requested
+        if compare_historically:
+            historical_dir = Path(__file__).parent.parent.parent / "data" / "historical"
+            map_dir = historical_dir / map_code.replace("-", "")
+            
+            if map_dir.exists():
+                snapshots = []
+                for file in sorted(map_dir.glob("*.json")):
+                    try:
+                        with open(file) as f:
+                            snapshots.append(json.load(f))
+                    except:
+                        continue
+                
+                if snapshots:
+                    # Extract historical values for this metric
+                    historical_values = []
+                    
+                    for snap in snapshots:
+                        snap_date = snap.get('collection_date', '')
+                        snap_value = None
+                        
+                        # Get value from snapshot based on metric
+                        if metric.lower() in ['ccu', 'avg_ccu', 'average_ccu']:
+                            snap_value = snap.get('summary', {}).get('avg_ccu')
+                        elif metric.lower() in ['max_ccu', 'peak_ccu']:
+                            snap_value = snap.get('summary', {}).get('max_ccu')
+                        elif metric.lower() in ['min_ccu', 'lowest_ccu']:
+                            snap_value = snap.get('summary', {}).get('min_ccu')
+                        elif metric.lower() == 'version':
+                            snap_value = snap.get('map_metadata', {}).get('version')
+                        elif metric.lower() in ['followers', 'creator_followers']:
+                            snap_value = snap.get('map_metadata', {}).get('creator_followers')
+                        elif metric.lower() in ['in_discovery', 'discovery']:
+                            snap_value = snap.get('map_metadata', {}).get('in_discovery')
+                        elif metric.lower() in ['xp_enabled', 'xp']:
+                            snap_value = snap.get('map_metadata', {}).get('xp_enabled')
+                        
+                        if snap_value is not None:
+                            historical_values.append({
+                                "date": snap_date,
+                                "value": int(snap_value) if isinstance(snap_value, (int, float, np.integer, np.floating)) else snap_value
+                            })
+                    
+                    if historical_values:
+                        # Calculate change
+                        oldest = historical_values[0]['value']
+                        newest = value
+                        
+                        if isinstance(oldest, (int, float)) and isinstance(newest, (int, float)):
+                            absolute_change = newest - oldest
+                            percent_change = round((absolute_change / oldest) * 100, 1) if oldest != 0 else 0
+                            
+                            trend = "increasing" if absolute_change > 0 else "decreasing" if absolute_change < 0 else "stable"
+                            
+                            result["historical_comparison"] = {
+                                "oldest_value": oldest,
+                                "oldest_date": historical_values[0]['date'],
+                                "absolute_change": absolute_change,
+                                "percent_change": percent_change,
+                                "trend": trend,
+                                "data_points": len(historical_values),
+                                "history": historical_values[-10:]  # Last 10 data points
+                            }
+                        else:
+                            # For non-numeric values (like boolean), show change history
+                            changes = []
+                            prev = None
+                            for hv in historical_values:
+                                if hv['value'] != prev:
+                                    changes.append(hv)
+                                    prev = hv['value']
+                            
+                            result["historical_comparison"] = {
+                                "changes_detected": len(changes) - 1 if changes else 0,
+                                "change_history": changes
+                            }
+                    else:
+                        result["historical_comparison"] = {
+                            "note": f"No historical data found for metric '{metric}'"
+                        }
+                else:
+                    result["historical_comparison"] = {
+                        "note": "No historical snapshots available yet"
+                    }
+            else:
+                result["historical_comparison"] = {
+                    "note": "No historical data collected for this map yet. Historical comparison will be available after daily collection runs."
+                }
+        
+        return result
+    
+    async def _check_map_updates(self, map_code: str) -> Dict[str, Any]:
+        """
+        Check if a map was recently updated by comparing version numbers
+        between current API data and historical snapshots.
+        """
+        
+        logger.info(f"🔄 Checking for updates on map {map_code}")
+        
+        from pathlib import Path
+        from datetime import datetime
+        import json
+        
+        # Fetch current map data from API
+        map_data = await fetch_map_from_api(map_code)
+        if not map_data:
+            return {
+                "error": f"Could not fetch map {map_code}. It may not exist or the API is unavailable."
+            }
+        
+        map_info = map_data.get('map_data', {})
+        map_name = map_info.get('name', 'Unknown Map')
+        current_version = map_info.get('version', 0)
+        created_at = map_info.get('createdAt', map_info.get('created', ''))
+        published_at = map_info.get('published', '')
+        
+        # Load historical data to find version history
+        historical_dir = Path(__file__).parent.parent.parent / "data" / "historical"
+        map_dir = historical_dir / map_code.replace("-", "")
+        
+        version_history = []
+        has_historical_data = False
+        
+        if map_dir.exists():
+            has_historical_data = True
+            snapshots = []
+            
+            for file in sorted(map_dir.glob("*.json")):
+                try:
+                    with open(file) as f:
+                        snapshot = json.load(f)
+                        snapshots.append({
+                            "date": snapshot.get('collection_date', file.stem),
+                            "version": snapshot.get('map_metadata', {}).get('version', 0)
+                        })
+                except:
+                    continue
+            
+            # Build version history (detect changes)
+            if snapshots:
+                prev_version = None
+                for snap in snapshots:
+                    if snap['version'] != prev_version:
+                        version_history.append({
+                            "version": int(snap['version']),
+                            "first_seen": snap['date']
+                        })
+                        prev_version = snap['version']
+                
+                # Check if current version is newer than last recorded
+                if version_history and current_version > version_history[-1]['version']:
+                    version_history.append({
+                        "version": int(current_version),
+                        "first_seen": datetime.now().strftime("%Y-%m-%d"),
+                        "detected_now": True
+                    })
+        
+        # Calculate update metrics
+        days_since_update = None
+        update_frequency = "unknown"
+        was_recently_updated = False
+        
+        if version_history and len(version_history) > 1:
+            # Calculate days since last update
+            last_update = version_history[-1]['first_seen']
+            try:
+                last_update_date = datetime.strptime(last_update, "%Y-%m-%d")
+                days_since_update = (datetime.now() - last_update_date).days
+                was_recently_updated = days_since_update <= 7
+            except:
+                pass
+            
+            # Calculate update frequency
+            if len(version_history) >= 3:
+                first_date = datetime.strptime(version_history[0]['first_seen'], "%Y-%m-%d")
+                last_date = datetime.strptime(version_history[-1]['first_seen'], "%Y-%m-%d")
+                days_span = (last_date - first_date).days
+                if days_span > 0:
+                    updates_per_month = (len(version_history) - 1) / (days_span / 30)
+                    if updates_per_month >= 4:
+                        update_frequency = "very_frequent"
+                    elif updates_per_month >= 2:
+                        update_frequency = "frequent"
+                    elif updates_per_month >= 1:
+                        update_frequency = "moderate"
+                    else:
+                        update_frequency = "infrequent"
+        
+        # Data source info
+        data_source = map_data.get('_source', 'live_api')
+        
+        return {
+            "success": True,
+            "map_code": map_code,
+            "map_name": map_name,
+            "current_version": int(current_version),
+            "version_history": version_history,
+            "has_historical_data": has_historical_data,
+            "update_analysis": {
+                "was_recently_updated": was_recently_updated,
+                "days_since_update": days_since_update,
+                "update_frequency": update_frequency,
+                "total_versions_tracked": len(version_history)
+            },
+            "dates": {
+                "created": created_at,
+                "published": published_at
+            },
+            "note": "Version history is built from daily data collection. More history = better tracking." if has_historical_data else "No historical data yet. Daily collection will build version history over time.",
+            "data_source": data_source
         }
     
     async def get_quick_insights(self, map_code: str) -> str:
