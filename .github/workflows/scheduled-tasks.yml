@@ -19,6 +19,10 @@ on:
           - weekly
           - all
 
+# Required for pushing commits back to repo
+permissions:
+  contents: write
+
 jobs:
   daily-collection:
     # Only run on daily schedule or manual trigger with 'daily' or 'all'
@@ -45,12 +49,14 @@ jobs:
           python scripts/scheduled_tasks.py daily
       
       - name: Commit and push historical data
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add project-harvest-backend/data/historical/
+          git add project-harvest-backend/data/historical/ || true
           git diff --staged --quiet || git commit -m "📊 Auto: Daily CCU data collection $(date +%Y-%m-%d)"
-          git push
+          git push || echo "Nothing to push or push failed"
 
   weekly-retrain:
     # Only run on weekly schedule or manual trigger with 'weekly' or 'all'
@@ -77,10 +83,12 @@ jobs:
           python scripts/scheduled_tasks.py weekly
       
       - name: Commit and push updated models
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add project-harvest-backend/data/models/
+          git add project-harvest-backend/data/models/ || true
           git diff --staged --quiet || git commit -m "🤖 Auto: Weekly model retrain $(date +%Y-%m-%d)"
-          git push
+          git push || echo "Nothing to push or push failed"
 
