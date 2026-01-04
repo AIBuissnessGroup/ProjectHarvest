@@ -1,0 +1,20 @@
+{
+  "last_training_date": "2026-01-04",
+  "last_data_date": "2026-01-04",
+  "models_trained": [
+    "future_ccu_predictor"
+  ],
+  "performance": {
+    "r2_score": 0.9732,
+    "mae": 31.64,
+    "training_samples": 1539,
+    "test_samples": 385,
+    "features": [
+      "baseline_ccu",
+      "trend_slope",
+      "recent_momentum",
+      "volatility",
+      "map_age_days"
+    ]
+  }
+}
