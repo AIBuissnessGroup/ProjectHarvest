@@ -1,0 +1,17 @@
+{
+  "date": "2026-02-04",
+  "total_maps": 964,
+  "successful": 962,
+  "failed": 2,
+  "skipped": 0,
+  "errors": [
+    {
+      "map_code": "0038-9297-7629",
+      "error": "Map not found"
+    },
+    {
+      "map_code": "0258_3511_4665",
+      "error": "'NoneType' object has no attribute 'get'"
+    }
+  ]
+}
