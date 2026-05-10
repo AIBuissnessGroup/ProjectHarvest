@@ -1,8 +1,8 @@
 {
   "model_type": "RandomForestRegressor",
-  "trained_date": "2026-05-10T08:49:35.304564",
-  "test_r2": 0.9838,
-  "test_mae": 27.59,
+  "trained_date": "2026-01-04T07:16:05.506331",
+  "test_r2": 0.9732,
+  "test_mae": 31.64,
   "training_samples": 1539,
   "features": [
     "baseline_ccu",
